@@ -1,0 +1,9 @@
+#!/bin/sh
+# Rejects commit messages that credit anyone but MuaazSM.
+# Comment lines are ignored, since git strips them from the final message anyway.
+msg_file="$1"
+
+if grep -v '^#' "$msg_file" | grep -qiE '^co-authored-by:|^signed-off-by:|generated with'; then
+  echo "commit-msg: Co-Authored-By, Signed-off-by and 'Generated with' lines are not allowed." >&2
+  exit 1
+fi

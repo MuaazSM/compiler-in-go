@@ -1,0 +1,7 @@
+*.pdf
+.reference/
+*.zip
+/monkey
+/fibonacci
+*.test
+.DS_Store
