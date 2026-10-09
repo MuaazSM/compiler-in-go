@@ -198,6 +198,150 @@ func TestDefineBuiltinDoesNotUseUpGlobalSlots(t *testing.T) {
 	}
 }
 
+func TestResolveFree(t *testing.T) {
+	global := NewSymbolTable()
+	global.Define("a")
+	global.Define("b")
+
+	firstLocal := NewEnclosedSymbolTable(global)
+	firstLocal.Define("c")
+	firstLocal.Define("d")
+
+	secondLocal := NewEnclosedSymbolTable(firstLocal)
+	secondLocal.Define("e")
+	secondLocal.Define("f")
+
+	tests := []struct {
+		table               *SymbolTable
+		expectedSymbols     []Symbol
+		expectedFreeSymbols []Symbol
+	}{
+		{
+			firstLocal,
+			[]Symbol{
+				{Name: "a", Scope: GlobalScope, Index: 0},
+				{Name: "b", Scope: GlobalScope, Index: 1},
+				{Name: "c", Scope: LocalScope, Index: 0},
+				{Name: "d", Scope: LocalScope, Index: 1},
+			},
+			[]Symbol{},
+		},
+		{
+			secondLocal,
+			[]Symbol{
+				{Name: "a", Scope: GlobalScope, Index: 0},
+				{Name: "b", Scope: GlobalScope, Index: 1},
+				// c and d belong to the enclosing function, so in here
+				// they're free variables.
+				{Name: "c", Scope: FreeScope, Index: 0},
+				{Name: "d", Scope: FreeScope, Index: 1},
+				{Name: "e", Scope: LocalScope, Index: 0},
+				{Name: "f", Scope: LocalScope, Index: 1},
+			},
+			// FreeSymbols remembers what each free variable was one level up.
+			[]Symbol{
+				{Name: "c", Scope: LocalScope, Index: 0},
+				{Name: "d", Scope: LocalScope, Index: 1},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		for _, sym := range tt.expectedSymbols {
+			result, ok := tt.table.Resolve(sym.Name)
+			if !ok {
+				t.Errorf("name %s not resolvable", sym.Name)
+				continue
+			}
+			if result != sym {
+				t.Errorf("expected %s to resolve to %+v, got=%+v",
+					sym.Name, sym, result)
+			}
+		}
+
+		if len(tt.table.FreeSymbols) != len(tt.expectedFreeSymbols) {
+			t.Errorf("wrong number of free symbols. got=%d, want=%d",
+				len(tt.table.FreeSymbols), len(tt.expectedFreeSymbols))
+			continue
+		}
+
+		for i, sym := range tt.expectedFreeSymbols {
+			result := tt.table.FreeSymbols[i]
+			if result != sym {
+				t.Errorf("wrong free symbol. got=%+v, want=%+v",
+					result, sym)
+			}
+		}
+	}
+}
+
+func TestResolveUnresolvableFree(t *testing.T) {
+	global := NewSymbolTable()
+	global.Define("a")
+
+	firstLocal := NewEnclosedSymbolTable(global)
+	firstLocal.Define("c")
+
+	secondLocal := NewEnclosedSymbolTable(firstLocal)
+	secondLocal.Define("e")
+	secondLocal.Define("f")
+
+	expected := []Symbol{
+		{Name: "a", Scope: GlobalScope, Index: 0},
+		{Name: "c", Scope: FreeScope, Index: 0},
+		{Name: "e", Scope: LocalScope, Index: 0},
+		{Name: "f", Scope: LocalScope, Index: 1},
+	}
+
+	for _, sym := range expected {
+		result, ok := secondLocal.Resolve(sym.Name)
+		if !ok {
+			t.Errorf("name %s not resolvable", sym.Name)
+			continue
+		}
+		if result != sym {
+			t.Errorf("expected %s to resolve to %+v, got=%+v",
+				sym.Name, sym, result)
+		}
+	}
+
+	for _, name := range []string{"b", "d"} {
+		if _, ok := secondLocal.Resolve(name); ok {
+			t.Errorf("name %s resolved, but was expected not to", name)
+		}
+	}
+}
+
+func TestResolveFreeThroughMiddleScope(t *testing.T) {
+	// outer defines x, middle never mentions it, inner uses it. For inner to
+	// get x, middle has to capture it first, so x is free in middle too.
+	global := NewSymbolTable()
+	outer := NewEnclosedSymbolTable(global)
+	outer.Define("x")
+	middle := NewEnclosedSymbolTable(outer)
+	inner := NewEnclosedSymbolTable(middle)
+
+	result, ok := inner.Resolve("x")
+	if !ok {
+		t.Fatalf("x not resolvable from inner")
+	}
+	if want := (Symbol{Name: "x", Scope: FreeScope, Index: 0}); result != want {
+		t.Errorf("inner x wrong. got=%+v, want=%+v", result, want)
+	}
+
+	if len(middle.FreeSymbols) != 1 {
+		t.Fatalf("middle should capture x. FreeSymbols=%+v", middle.FreeSymbols)
+	}
+	if want := (Symbol{Name: "x", Scope: LocalScope, Index: 0}); middle.FreeSymbols[0] != want {
+		t.Errorf("middle free symbol wrong. got=%+v, want=%+v", middle.FreeSymbols[0], want)
+	}
+
+	if want := (Symbol{Name: "x", Scope: FreeScope, Index: 0}); inner.FreeSymbols[0] != middle.store["x"] || middle.store["x"] != want {
+		t.Errorf("inner should capture middle's free x. inner=%+v middle=%+v",
+			inner.FreeSymbols, middle.store["x"])
+	}
+}
+
 func TestResolveUnknown(t *testing.T) {
 	global := NewSymbolTable()
 

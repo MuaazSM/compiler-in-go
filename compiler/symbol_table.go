@@ -9,6 +9,7 @@ const (
 	GlobalScope  SymbolScope = "GLOBAL"
 	LocalScope   SymbolScope = "LOCAL"
 	BuiltinScope SymbolScope = "BUILTIN"
+	FreeScope    SymbolScope = "FREE"
 )
 
 // Symbol is everything the compiler needs to know about a name.
@@ -27,6 +28,11 @@ type SymbolTable struct {
 
 	store          map[string]Symbol
 	numDefinitions int
+
+	// FreeSymbols lists the outer variables this function captures, in the
+	// order it captured them. Each entry is the symbol as the enclosing
+	// scope sees it, which tells the compiler how to load it there.
+	FreeSymbols []Symbol
 }
 
 // NewSymbolTable returns an empty table.
@@ -67,12 +73,41 @@ func (s *SymbolTable) DefineBuiltin(index int, name string) Symbol {
 	return symbol
 }
 
+// defineFree records that this function captures original from an enclosing
+// scope, and returns the symbol code in this function should use for it.
+// Concept: free variable — a variable used inside a function but defined in an enclosing one.
+func (s *SymbolTable) defineFree(original Symbol) Symbol {
+	s.FreeSymbols = append(s.FreeSymbols, original)
+
+	symbol := Symbol{Name: original.Name, Index: len(s.FreeSymbols) - 1}
+	symbol.Scope = FreeScope
+
+	s.store[original.Name] = symbol
+	return symbol
+}
+
 // Resolve looks a name up here first, then in each enclosing table in turn.
 // The bool is false if no table has it.
+//
+// Globals and builtins are reachable from anywhere, so they come back as is.
+// Anything else found further out belongs to an enclosing function and has
+// to be captured. Because each level calls Resolve on the next, a variable
+// two functions up gets captured by the middle function first and then by
+// this one; that's how it reaches us even if the middle one never uses it.
 func (s *SymbolTable) Resolve(name string) (Symbol, bool) {
 	obj, ok := s.store[name]
 	if !ok && s.Outer != nil {
-		return s.Outer.Resolve(name)
+		obj, ok = s.Outer.Resolve(name)
+		if !ok {
+			return obj, ok
+		}
+
+		if obj.Scope == GlobalScope || obj.Scope == BuiltinScope {
+			return obj, ok
+		}
+
+		free := s.defineFree(obj)
+		return free, true
 	}
 	return obj, ok
 }
