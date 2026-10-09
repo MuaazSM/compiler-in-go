@@ -120,6 +120,8 @@ const (
 	// closure. Operands: the constant index, then how many free variables to
 	// take off the stack.
 	OpClosure
+	// OpGetFree pushes one of the running closure's captured values.
+	OpGetFree
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -168,6 +170,7 @@ var definitions = map[Opcode]*Definition{
 
 	OpGetBuiltin: {"OpGetBuiltin", []int{1}},
 	OpClosure:    {"OpClosure", []int{2, 1}},
+	OpGetFree:    {"OpGetFree", []int{1}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.

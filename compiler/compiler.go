@@ -335,19 +335,28 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpReturn)
 		}
 
-		// Read this before leaveScope throws the function's table away.
+		// Read these before leaveScope throws the function's table away.
+		freeSymbols := c.symbolTable.FreeSymbols
 		numLocals := c.symbolTable.numDefinitions
 		instructions := c.leaveScope()
+
+		// We're back in the enclosing scope now. Push the current value of
+		// every variable the function captures; OpClosure will copy them
+		// off the stack into the closure. This happens once, when the
+		// closure is made, so later changes in the outer function don't
+		// show up inside it.
+		for _, s := range freeSymbols {
+			c.loadSymbol(s)
+		}
 
 		compiledFn := &object.CompiledFunction{
 			Instructions:  instructions,
 			NumLocals:     numLocals,
 			NumParameters: len(node.Parameters),
 		}
-		// The VM only ever calls closures, so even a function that captures
-		// nothing gets wrapped in one. The 0 is how many values it captures.
+
 		fnIndex := c.addConstant(compiledFn)
-		c.emit(code.OpClosure, fnIndex, 0)
+		c.emit(code.OpClosure, fnIndex, len(freeSymbols))
 
 	case *ast.ReturnStatement:
 		err := c.Compile(node.ReturnValue)
@@ -474,6 +483,8 @@ func (c *Compiler) loadSymbol(s Symbol) {
 		c.emit(code.OpGetLocal, s.Index)
 	case BuiltinScope:
 		c.emit(code.OpGetBuiltin, s.Index)
+	case FreeScope:
+		c.emit(code.OpGetFree, s.Index)
 	}
 }
 
