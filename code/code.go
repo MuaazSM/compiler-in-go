@@ -62,6 +62,8 @@ const (
 	// OpConstant pushes a value from the constant pool. Its operand is the pool index.
 	// Concept: constant pool — a side list of values (numbers, strings, functions) that instructions refer to by index.
 	OpConstant Opcode = iota
+	// OpAdd pops the top two values and pushes their sum. It has no operands.
+	OpAdd
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -74,6 +76,7 @@ type Definition struct {
 var definitions = map[Opcode]*Definition{
 	// Two bytes lets us index up to 65536 constants.
 	OpConstant: {"OpConstant", []int{2}},
+	OpAdd:      {"OpAdd", []int{}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.
