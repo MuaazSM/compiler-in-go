@@ -192,10 +192,16 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return err
 		}
 
-		// The value is on the stack now; store it in the name's global slot.
+		// The value is on the stack now; store it in the name's slot. At the
+		// top level that's a global; inside a function it's a local.
 		// Concept: global binding — a variable stored in a fixed-size globals array, looked up by index.
+		// Concept: local binding — a variable that lives in the stack slots reserved for the current call.
 		symbol := c.symbolTable.Define(node.Name.Value)
-		c.emit(code.OpSetGlobal, symbol.Index)
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpSetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpSetLocal, symbol.Index)
+		}
 
 	case *ast.Identifier:
 		symbol, ok := c.symbolTable.Resolve(node.Value)
@@ -203,7 +209,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return fmt.Errorf("undefined variable %s", node.Value)
 		}
 
-		c.emit(code.OpGetGlobal, symbol.Index)
+		if symbol.Scope == GlobalScope {
+			c.emit(code.OpGetGlobal, symbol.Index)
+		} else {
+			c.emit(code.OpGetLocal, symbol.Index)
+		}
 
 	case *ast.BlockStatement:
 		for _, s := range node.Statements {
@@ -318,9 +328,14 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpReturn)
 		}
 
+		// Read this before leaveScope throws the function's table away.
+		numLocals := c.symbolTable.numDefinitions
 		instructions := c.leaveScope()
 
-		compiledFn := &object.CompiledFunction{Instructions: instructions}
+		compiledFn := &object.CompiledFunction{
+			Instructions: instructions,
+			NumLocals:    numLocals,
+		}
 		c.emit(code.OpConstant, c.addConstant(compiledFn))
 
 	case *ast.ReturnStatement:
@@ -430,7 +445,8 @@ func (c *Compiler) changeOperand(opPos int, operand int) {
 	c.replaceInstruction(opPos, newInstruction)
 }
 
-// enterScope starts a fresh instruction buffer for a function body.
+// enterScope starts a fresh instruction buffer and a fresh symbol table for a
+// function body. Names defined inside become locals of that function.
 func (c *Compiler) enterScope() {
 	scope := CompilationScope{
 		instructions:        code.Instructions{},
@@ -439,14 +455,19 @@ func (c *Compiler) enterScope() {
 	}
 	c.scopes = append(c.scopes, scope)
 	c.scopeIndex++
+
+	c.symbolTable = NewEnclosedSymbolTable(c.symbolTable)
 }
 
-// leaveScope drops the innermost buffer and hands back what was compiled into it.
+// leaveScope drops the innermost buffer and symbol table, and hands back what
+// was compiled into the buffer.
 func (c *Compiler) leaveScope() code.Instructions {
 	instructions := c.currentInstructions()
 
 	c.scopes = c.scopes[:len(c.scopes)-1]
 	c.scopeIndex--
+
+	c.symbolTable = c.symbolTable.Outer
 
 	return instructions
 }

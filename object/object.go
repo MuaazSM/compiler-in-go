@@ -188,6 +188,9 @@ func (h *Hash) Inspect() string {
 // in the constant pool like any other literal value.
 type CompiledFunction struct {
 	Instructions code.Instructions
+	// NumLocals tells the VM how many stack slots to set aside for this
+	// function's local variables when it's called.
+	NumLocals int
 }
 
 func (cf *CompiledFunction) Type() ObjectType { return COMPILED_FUNCTION_OBJ }

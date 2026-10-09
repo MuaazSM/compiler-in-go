@@ -106,6 +106,10 @@ const (
 	OpReturnValue
 	// OpReturn returns from a function that has nothing to give back (null).
 	OpReturn
+	// OpGetLocal and OpSetLocal read and write a local variable of the
+	// running function. One byte of operand allows 256 locals per function.
+	OpGetLocal
+	OpSetLocal
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -148,6 +152,9 @@ var definitions = map[Opcode]*Definition{
 	OpCall:        {"OpCall", []int{}},
 	OpReturnValue: {"OpReturnValue", []int{}},
 	OpReturn:      {"OpReturn", []int{}},
+
+	OpGetLocal: {"OpGetLocal", []int{1}},
+	OpSetLocal: {"OpSetLocal", []int{1}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.
@@ -183,6 +190,8 @@ func Make(op Opcode, operands ...int) []byte {
 		case 2:
 			// Concept: big-endian — the most significant byte comes first in memory.
 			binary.BigEndian.PutUint16(instruction[offset:], uint16(o))
+		case 1:
+			instruction[offset] = byte(o)
 		}
 		offset += width
 	}
@@ -200,6 +209,8 @@ func ReadOperands(def *Definition, ins Instructions) ([]int, int) {
 		switch width {
 		case 2:
 			operands[i] = int(ReadUint16(ins[offset:]))
+		case 1:
+			operands[i] = int(ReadUint8(ins[offset:]))
 		}
 
 		offset += width
@@ -212,4 +223,9 @@ func ReadOperands(def *Definition, ins Instructions) ([]int, int) {
 // to skip the slice allocation that ReadOperands would do.
 func ReadUint16(ins Instructions) uint16 {
 	return binary.BigEndian.Uint16(ins)
+}
+
+// ReadUint8 reads a one-byte operand.
+func ReadUint8(ins Instructions) uint8 {
+	return uint8(ins[0])
 }
