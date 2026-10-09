@@ -64,6 +64,8 @@ const (
 	OpConstant Opcode = iota
 	// OpAdd pops the top two values and pushes their sum. It has no operands.
 	OpAdd
+	// OpPop throws away the top of the stack. It ends every expression statement.
+	OpPop
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -77,6 +79,7 @@ var definitions = map[Opcode]*Definition{
 	// Two bytes lets us index up to 65536 constants.
 	OpConstant: {"OpConstant", []int{2}},
 	OpAdd:      {"OpAdd", []int{}},
+	OpPop:      {"OpPop", []int{}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.

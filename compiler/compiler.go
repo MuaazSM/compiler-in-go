@@ -38,6 +38,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 		if err != nil {
 			return err
 		}
+		// A statement like `1 + 2;` leaves its value on the stack, and nobody
+		// is going to use it. Without this pop, a long program would keep
+		// piling up leftovers until the stack overflowed.
+		c.emit(code.OpPop)
 
 	case *ast.InfixExpression:
 		// Both sides go on the stack first (left, then right), and then the

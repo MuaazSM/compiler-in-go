@@ -11,6 +11,7 @@ func TestMake(t *testing.T) {
 		// 65534 is 0xFFFE, so big-endian puts 0xFF first.
 		{OpConstant, []int{65534}, []byte{byte(OpConstant), 255, 254}},
 		{OpAdd, []int{}, []byte{byte(OpAdd)}},
+		{OpPop, []int{}, []byte{byte(OpPop)}},
 	}
 
 	for _, tt := range tests {

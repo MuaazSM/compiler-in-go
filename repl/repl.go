@@ -46,10 +46,11 @@ func Start(in io.Reader, out io.Writer) {
 			continue
 		}
 
-		// Whatever is left on top of the stack is the result of the line.
-		stackTop := machine.StackTop()
-		if stackTop != nil {
-			io.WriteString(out, stackTop.Inspect())
+		// The line's result was popped by its final OpPop, but it's still in
+		// the slot just above the stack pointer. Nil means nothing ran.
+		lastPopped := machine.LastPoppedStackElem()
+		if lastPopped != nil {
+			io.WriteString(out, lastPopped.Inspect())
 			io.WriteString(out, "\n")
 		}
 	}

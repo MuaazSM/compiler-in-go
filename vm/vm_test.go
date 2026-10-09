@@ -20,6 +20,7 @@ func TestIntegerArithmetic(t *testing.T) {
 		{"1", 1},
 		{"2", 2},
 		{"1 + 2", 3},
+		{"1; 2", 2},
 	}
 
 	runVmTests(t, tests)
@@ -43,7 +44,9 @@ func runVmTests(t *testing.T, tests []vmTestCase) {
 			t.Fatalf("vm error: %s", err)
 		}
 
-		stackElem := vm.StackTop()
+		// Every expression statement ends in OpPop, so the result has already
+		// left the stack by the time Run returns.
+		stackElem := vm.LastPoppedStackElem()
 
 		testExpectedObject(t, tt.expected, stackElem)
 	}

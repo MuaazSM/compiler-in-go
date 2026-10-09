@@ -42,6 +42,13 @@ func (vm *VM) StackTop() object.Object {
 	return vm.stack[vm.sp-1]
 }
 
+// LastPoppedStackElem returns the value the last OpPop removed. Popping only
+// moves sp down, so that value is still sitting in the slot sp now points at.
+// Concept: stack pointer (sp) — points at the next free slot; the top value is at sp-1.
+func (vm *VM) LastPoppedStackElem() object.Object {
+	return vm.stack[vm.sp]
+}
+
 // Run executes the instructions from start to finish.
 // Concept: fetch-decode-execute — read an instruction, figure out what it means, do it, repeat.
 func (vm *VM) Run() error {
@@ -76,6 +83,9 @@ func (vm *VM) Run() error {
 			if err != nil {
 				return err
 			}
+
+		case code.OpPop:
+			vm.pop()
 		}
 	}
 
