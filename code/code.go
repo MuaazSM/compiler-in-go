@@ -93,6 +93,8 @@ const (
 	// The operand is the slot index the symbol table handed out.
 	OpGetGlobal
 	OpSetGlobal
+	// OpArray pops n elements and pushes them as one array. n is the operand.
+	OpArray
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -127,6 +129,8 @@ var definitions = map[Opcode]*Definition{
 
 	OpGetGlobal: {"OpGetGlobal", []int{2}},
 	OpSetGlobal: {"OpSetGlobal", []int{2}},
+
+	OpArray: {"OpArray", []int{2}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.

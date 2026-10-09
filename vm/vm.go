@@ -169,6 +169,19 @@ func (vm *VM) Run() error {
 				return err
 			}
 
+		case code.OpArray:
+			numElements := int(code.ReadUint16(vm.instructions[ip+1:]))
+			ip += 2
+
+			array := vm.buildArray(vm.sp-numElements, vm.sp)
+			// Drop the elements now that they live inside the array.
+			vm.sp = vm.sp - numElements
+
+			err := vm.push(array)
+			if err != nil {
+				return err
+			}
+
 		case code.OpNull:
 			err := vm.push(Null)
 			if err != nil {
@@ -181,6 +194,18 @@ func (vm *VM) Run() error {
 	}
 
 	return nil
+}
+
+// buildArray copies stack[startIndex:endIndex] into a new array. The elements
+// were pushed in source order, so the lowest slot is the first element.
+func (vm *VM) buildArray(startIndex, endIndex int) object.Object {
+	elements := make([]object.Object, endIndex-startIndex)
+
+	for i := startIndex; i < endIndex; i++ {
+		elements[i-startIndex] = vm.stack[i]
+	}
+
+	return &object.Array{Elements: elements}
 }
 
 // executeBinaryOperation pops two operands and pushes the result of op.
