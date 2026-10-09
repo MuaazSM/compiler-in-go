@@ -27,6 +27,7 @@ func TestMake(t *testing.T) {
 		{OpReturnValue, []int{}, []byte{byte(OpReturnValue)}},
 		{OpReturn, []int{}, []byte{byte(OpReturn)}},
 		{OpGetLocal, []int{255}, []byte{byte(OpGetLocal), 255}},
+		{OpGetBuiltin, []int{5}, []byte{byte(OpGetBuiltin), 5}},
 	}
 
 	for _, tt := range tests {

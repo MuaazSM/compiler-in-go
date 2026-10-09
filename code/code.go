@@ -111,6 +111,9 @@ const (
 	// running function. One byte of operand allows 256 locals per function.
 	OpGetLocal
 	OpSetLocal
+	// OpGetBuiltin pushes one of the builtin functions. The operand is its
+	// position in object.Builtins.
+	OpGetBuiltin
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -156,6 +159,8 @@ var definitions = map[Opcode]*Definition{
 
 	OpGetLocal: {"OpGetLocal", []int{1}},
 	OpSetLocal: {"OpSetLocal", []int{1}},
+
+	OpGetBuiltin: {"OpGetBuiltin", []int{1}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.

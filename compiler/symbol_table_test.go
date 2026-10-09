@@ -155,6 +155,49 @@ func TestResolveNestedLocal(t *testing.T) {
 	}
 }
 
+func TestDefineResolveBuiltins(t *testing.T) {
+	global := NewSymbolTable()
+	firstLocal := NewEnclosedSymbolTable(global)
+	secondLocal := NewEnclosedSymbolTable(firstLocal)
+
+	expected := []Symbol{
+		{Name: "a", Scope: BuiltinScope, Index: 0},
+		{Name: "c", Scope: BuiltinScope, Index: 1},
+		{Name: "e", Scope: BuiltinScope, Index: 2},
+		{Name: "f", Scope: BuiltinScope, Index: 3},
+	}
+
+	for i, v := range expected {
+		global.DefineBuiltin(i, v.Name)
+	}
+
+	// Builtins are visible from every depth and keep their own index.
+	for _, table := range []*SymbolTable{global, firstLocal, secondLocal} {
+		for _, sym := range expected {
+			result, ok := table.Resolve(sym.Name)
+			if !ok {
+				t.Errorf("name %s not resolvable", sym.Name)
+				continue
+			}
+			if result != sym {
+				t.Errorf("expected %s to resolve to %+v, got=%+v",
+					sym.Name, sym, result)
+			}
+		}
+	}
+}
+
+func TestDefineBuiltinDoesNotUseUpGlobalSlots(t *testing.T) {
+	global := NewSymbolTable()
+	global.DefineBuiltin(0, "len")
+
+	// The first real global still gets slot 0.
+	a := global.Define("a")
+	if a.Index != 0 || a.Scope != GlobalScope {
+		t.Errorf("expected a to be global 0, got=%+v", a)
+	}
+}
+
 func TestResolveUnknown(t *testing.T) {
 	global := NewSymbolTable()
 
