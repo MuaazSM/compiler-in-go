@@ -67,7 +67,7 @@ func parse(input string) *ast.Program {
 func testInstructions(expected []code.Instructions, actual code.Instructions) error {
 	concatted := concatInstructions(expected)
 
-	// Compare the disassembly too, so a failure shows readable instructions, not raw bytes.
+	// Instructions has a String() method, so %q prints the disassembly on failure, not raw bytes.
 	if len(actual) != len(concatted) {
 		return fmt.Errorf("wrong instructions length.\nwant=%q\ngot =%q",
 			concatted, actual)
