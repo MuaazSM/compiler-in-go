@@ -192,6 +192,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.changeOperand(jumpPos, afterAlternativePos)
 
 	case *ast.LetStatement:
+		// Define the name before compiling the value, so a function can
+		// refer to the name it's being bound to. Without this,
+		// `let f = fn() { f() }` fails with "undefined variable f".
+		symbol := c.symbolTable.Define(node.Name.Value)
+
 		err := c.Compile(node.Value)
 		if err != nil {
 			return err
@@ -201,7 +206,6 @@ func (c *Compiler) Compile(node ast.Node) error {
 		// top level that's a global; inside a function it's a local.
 		// Concept: global binding — a variable stored in a fixed-size globals array, looked up by index.
 		// Concept: local binding — a variable that lives in the stack slots reserved for the current call.
-		symbol := c.symbolTable.Define(node.Name.Value)
 		if symbol.Scope == GlobalScope {
 			c.emit(code.OpSetGlobal, symbol.Index)
 		} else {
