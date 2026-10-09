@@ -1077,6 +1077,30 @@ func TestRecursiveFunctions(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
+func TestLetCannotReadItself(t *testing.T) {
+	// A non-function value can't refer to the name it's being bound to: it
+	// doesn't have a value yet.
+	tests := []struct {
+		input string
+		name  string
+	}{
+		{"let y = y;", "y"},
+		{"fn() { let z = z; }", "z"},
+	}
+
+	for _, tt := range tests {
+		compiler := New()
+		err := compiler.Compile(parse(tt.input))
+		if err == nil {
+			t.Errorf("expected a compile error for %q, got none", tt.input)
+			continue
+		}
+		if err.Error() != "undefined variable "+tt.name {
+			t.Errorf("wrong error for %q: %q", tt.input, err)
+		}
+	}
+}
+
 func runCompilerTests(t *testing.T, tests []compilerTestCase) {
 	t.Helper()
 

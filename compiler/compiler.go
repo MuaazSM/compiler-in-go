@@ -191,15 +191,17 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.changeOperand(jumpPos, afterAlternativePos)
 
 	case *ast.LetStatement:
-		// Define the name before compiling the value, so a function can
-		// refer to the name it's being bound to. Without this,
-		// `let f = fn() { f() }` fails with "undefined variable f".
-		symbol := c.symbolTable.Define(node.Name.Value)
-
+		// Compile the value first, while the name still means whatever it
+		// meant before this line. So `let x = x + 1` reads the old x, and
+		// `let y = y` is an error, just like in the evaluator. A function
+		// that calls itself doesn't need the name yet: it reaches itself
+		// through its own name (see DefineFunctionName).
 		err := c.Compile(node.Value)
 		if err != nil {
 			return err
 		}
+
+		symbol := c.symbolTable.Define(node.Name.Value)
 
 		// The value is on the stack now; store it in the name's slot. At the
 		// top level that's a global; inside a function it's a local.

@@ -722,6 +722,17 @@ func TestUnknownOpcodeIsAnError(t *testing.T) {
 	}
 }
 
+func TestLetSeesPreviousBinding(t *testing.T) {
+	// The value is worked out before the new binding exists, so `x` on the
+	// right means the old x. Same as the tree-walking evaluator.
+	tests := []vmTestCase{
+		{"let x = 1; let x = x + 1; x", 2},
+		{"let f = fn() { let x = 1; let x = x * 10; x }; f()", 10},
+	}
+
+	runVmTests(t, tests)
+}
+
 func TestRecursiveFunctions(t *testing.T) {
 	tests := []vmTestCase{
 		{
