@@ -402,6 +402,121 @@ func TestCallingFunctionsWithBindings(t *testing.T) {
 	runVmTests(t, tests)
 }
 
+func TestCallingFunctionsWithArgumentsAndBindings(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+			let identity = fn(a) { a; };
+			identity(4);
+			`,
+			expected: 4,
+		},
+		{
+			input: `
+			let sum = fn(a, b) { a + b; };
+			sum(1, 2);
+			`,
+			expected: 3,
+		},
+		{
+			input: `
+			let sum = fn(a, b) {
+				let c = a + b;
+				c;
+			};
+			sum(1, 2);
+			`,
+			expected: 3,
+		},
+		{
+			input: `
+			let sum = fn(a, b) {
+				let c = a + b;
+				c;
+			};
+			sum(1, 2) + sum(3, 4);`,
+			expected: 10,
+		},
+		{
+			input: `
+			let sum = fn(a, b) {
+				let c = a + b;
+				c;
+			};
+			let outer = fn() {
+				sum(1, 2) + sum(3, 4);
+			};
+			outer();
+			`,
+			expected: 10,
+		},
+		{
+			input: `
+			let globalNum = 10;
+
+			let sum = fn(a, b) {
+				let c = a + b;
+				c + globalNum;
+			};
+
+			let outer = fn() {
+				sum(1, 2) + sum(3, 4) + globalNum;
+			};
+
+			outer() + globalNum;
+			`,
+			expected: 50,
+		},
+		{
+			// Argument order matters: a - b, not b - a.
+			input: `
+			let minus = fn(a, b) { a - b };
+			minus(10, 3);
+			`,
+			expected: 7,
+		},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestCallingFunctionsWithWrongArguments(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input:    `fn() { 1; }(1);`,
+			expected: `wrong number of arguments: want=0, got=1`,
+		},
+		{
+			input:    `fn(a) { a; }();`,
+			expected: `wrong number of arguments: want=1, got=0`,
+		},
+		{
+			input:    `fn(a, b) { a + b; }(1);`,
+			expected: `wrong number of arguments: want=2, got=1`,
+		},
+	}
+
+	for _, tt := range tests {
+		program := parse(tt.input)
+
+		comp := compiler.New()
+		err := comp.Compile(program)
+		if err != nil {
+			t.Fatalf("compiler error: %s", err)
+		}
+
+		vm := New(comp.Bytecode())
+		err = vm.Run()
+		if err == nil {
+			t.Fatalf("expected VM error but resulted in none.")
+		}
+
+		if err.Error() != tt.expected {
+			t.Fatalf("wrong VM error: want=%q, got=%q", tt.expected, err)
+		}
+	}
+}
+
 func TestTopLevelReturn(t *testing.T) {
 	// A `return` outside any function ends the program with that value,
 	// the same as in the tree-walking evaluator.
@@ -435,8 +550,12 @@ func TestCallingNonFunctionIsAnError(t *testing.T) {
 		t.Fatalf("compiler error: %s", err)
 	}
 
-	if err := New(comp.Bytecode()).Run(); err == nil {
+	err := New(comp.Bytecode()).Run()
+	if err == nil {
 		t.Fatalf("expected an error for calling an integer, got none")
+	}
+	if err.Error() != "calling non-function" {
+		t.Fatalf("wrong VM error: got=%q", err)
 	}
 }
 

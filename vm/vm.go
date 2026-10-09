@@ -250,40 +250,14 @@ func (vm *VM) Run() error {
 				return err
 			}
 
-		// While a function runs, the stack looks like this. Everything from
-		// basePointer up belongs to the call. With no arguments yet,
-		// basePointer sits right above the callee.
-		//
-		//             ┌───────────────┐
-		//  sp ──────▶ │               │
-		//             │ local k       │
-		//             │ ...           │
-		//             │ arg n-1       │
-		//             │ arg 0         │ ◀── basePointer
-		//             │ callee (fn)   │
-		//             │ caller's data │
-		//             └───────────────┘
 		case code.OpCall:
-			// Arguments aren't passed yet; step over the count for now.
+			numArgs := code.ReadUint8(ins[ip+1:])
 			vm.currentFrame().ip += 1
 
-			fn, ok := vm.stack[vm.sp-1].(*object.CompiledFunction)
-			if !ok {
-				return fmt.Errorf("calling non-function")
-			}
-
-			frame := NewFrame(fn, vm.sp)
-			err := vm.pushFrame(frame)
+			err := vm.callFunction(int(numArgs))
 			if err != nil {
 				return err
 			}
-
-			// Bump sp past the local slots so pushes during the call
-			// can't land on top of them.
-			if frame.basePointer+fn.NumLocals > StackSize {
-				return fmt.Errorf("stack overflow")
-			}
-			vm.sp = frame.basePointer + fn.NumLocals
 
 		case code.OpReturnValue:
 			returnValue := vm.pop()
@@ -377,6 +351,54 @@ func (vm *VM) buildHash(startIndex, endIndex int) (object.Object, error) {
 	}
 
 	return &object.Hash{Pairs: hashedPairs}, nil
+}
+
+// callFunction starts a call to the function sitting below its numArgs
+// arguments on the stack.
+//
+// While a function runs, the stack looks like this. Everything from
+// basePointer up belongs to the call:
+//
+//	           ┌───────────────┐
+//	sp ──────▶ │               │
+//	           │ local k       │
+//	           │ ...           │
+//	           │ arg n-1       │
+//	           │ arg 0         │ ◀── basePointer
+//	           │ callee (fn)   │
+//	           │ caller's data │
+//	           └───────────────┘
+//
+// Concept: calling convention — the agreed stack layout for callee, arguments and locals during a call.
+func (vm *VM) callFunction(numArgs int) error {
+	fn, ok := vm.stack[vm.sp-1-numArgs].(*object.CompiledFunction)
+	if !ok {
+		return fmt.Errorf("calling non-function")
+	}
+
+	if numArgs != fn.NumParameters {
+		return fmt.Errorf("wrong number of arguments: want=%d, got=%d",
+			fn.NumParameters, numArgs)
+	}
+
+	// The arguments were pushed right before the call, so they already sit
+	// in the first slots above the callee. Starting the locals there means
+	// argument i *is* local i. Nothing gets copied; we just point the frame
+	// at the slots the caller filled in.
+	frame := NewFrame(fn, vm.sp-numArgs)
+	err := vm.pushFrame(frame)
+	if err != nil {
+		return err
+	}
+
+	// Bump sp past the remaining local slots so pushes during the call
+	// can't land on top of them. NumLocals already counts the parameters.
+	if frame.basePointer+fn.NumLocals > StackSize {
+		return fmt.Errorf("stack overflow")
+	}
+	vm.sp = frame.basePointer + fn.NumLocals
+
+	return nil
 }
 
 // executeIndexExpression pushes left[index]. A missing element gives null
