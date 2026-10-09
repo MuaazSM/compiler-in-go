@@ -79,6 +79,9 @@ const (
 	OpEqual
 	OpNotEqual
 	OpGreaterThan
+	// OpMinus negates the integer on top of the stack; OpBang flips its truthiness.
+	OpMinus
+	OpBang
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -102,6 +105,9 @@ var definitions = map[Opcode]*Definition{
 	OpEqual:       {"OpEqual", []int{}},
 	OpNotEqual:    {"OpNotEqual", []int{}},
 	OpGreaterThan: {"OpGreaterThan", []int{}},
+
+	OpMinus: {"OpMinus", []int{}},
+	OpBang:  {"OpBang", []int{}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.

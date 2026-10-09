@@ -30,6 +30,10 @@ func TestIntegerArithmetic(t *testing.T) {
 		{"5 * 2 + 10", 20},
 		{"5 + 2 * 10", 25},
 		{"5 * (2 + 10)", 60},
+		{"-5", -5},
+		{"-10", -10},
+		{"-50 + 100 + -50", 0},
+		{"(5 + 10 * 2 + 15 / 3) * 2 + -10", 50},
 	}
 
 	runVmTests(t, tests)
@@ -56,6 +60,14 @@ func TestBooleanExpressions(t *testing.T) {
 		{"(1 < 2) == false", false},
 		{"(1 > 2) == true", false},
 		{"(1 > 2) == false", true},
+		{"!true", false},
+		{"!false", true},
+		{"!5", false},
+		{"!!true", true},
+		{"!!false", false},
+		{"!!5", true},
+		{"-(5 + 10 * 2) == -25", true},
+		{"!(1 < 2) == false", true},
 	}
 
 	runVmTests(t, tests)
@@ -164,6 +176,18 @@ func TestComparingMixedTypes(t *testing.T) {
 	}
 
 	runVmTests(t, tests)
+}
+
+func TestMinusOnNonInteger(t *testing.T) {
+	comp := compiler.New()
+	if err := comp.Compile(parse("-true")); err != nil {
+		t.Fatalf("compiler error: %s", err)
+	}
+
+	err := New(comp.Bytecode()).Run()
+	if err == nil {
+		t.Fatalf("expected an error for -true, got none")
+	}
 }
 
 func TestDivisionByZero(t *testing.T) {
