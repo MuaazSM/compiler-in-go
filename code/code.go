@@ -100,6 +100,12 @@ const (
 	OpHash
 	// OpIndex pops an index and the thing being indexed, and pushes the element.
 	OpIndex
+	// OpCall calls the function sitting on top of the stack.
+	OpCall
+	// OpReturnValue returns the value on top of the stack to the caller.
+	OpReturnValue
+	// OpReturn returns from a function that has nothing to give back (null).
+	OpReturn
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -138,6 +144,10 @@ var definitions = map[Opcode]*Definition{
 	OpArray: {"OpArray", []int{2}},
 	OpHash:  {"OpHash", []int{2}},
 	OpIndex: {"OpIndex", []int{}},
+
+	OpCall:        {"OpCall", []int{}},
+	OpReturnValue: {"OpReturnValue", []int{}},
+	OpReturn:      {"OpReturn", []int{}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.
