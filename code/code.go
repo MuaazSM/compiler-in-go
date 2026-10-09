@@ -122,6 +122,9 @@ const (
 	OpClosure
 	// OpGetFree pushes one of the running closure's captured values.
 	OpGetFree
+	// OpCurrentClosure pushes the closure that's running right now. A
+	// function uses it to call itself.
+	OpCurrentClosure
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -171,6 +174,8 @@ var definitions = map[Opcode]*Definition{
 	OpGetBuiltin: {"OpGetBuiltin", []int{1}},
 	OpClosure:    {"OpClosure", []int{2, 1}},
 	OpGetFree:    {"OpGetFree", []int{1}},
+
+	OpCurrentClosure: {"OpCurrentClosure", []int{}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.

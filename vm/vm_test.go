@@ -665,6 +665,50 @@ func TestClosures(t *testing.T) {
 	runVmTests(t, tests)
 }
 
+func TestCurrentClosure(t *testing.T) {
+	// fn(x) { <the running closure> }. The argument sits on top of the
+	// stack, so if OpCurrentClosure did nothing we'd get 5 back instead.
+	fn := &object.CompiledFunction{
+		Instructions: concat(
+			code.Make(code.OpCurrentClosure),
+			code.Make(code.OpReturnValue),
+		),
+		NumLocals:     1,
+		NumParameters: 1,
+	}
+	bytecode := &compiler.Bytecode{
+		Instructions: concat(
+			code.Make(code.OpClosure, 0, 0),
+			code.Make(code.OpConstant, 1),
+			code.Make(code.OpCall, 1),
+			code.Make(code.OpPop),
+		),
+		Constants: []object.Object{fn, &object.Integer{Value: 5}},
+	}
+
+	vm := New(bytecode)
+	if err := vm.Run(); err != nil {
+		t.Fatalf("vm error: %s", err)
+	}
+
+	cl, ok := vm.LastPoppedStackElem().(*object.Closure)
+	if !ok {
+		t.Fatalf("expected a closure, got %T (%+v)",
+			vm.LastPoppedStackElem(), vm.LastPoppedStackElem())
+	}
+	if cl.Fn != fn {
+		t.Errorf("got a closure around the wrong function")
+	}
+}
+
+func concat(parts ...[]byte) code.Instructions {
+	out := code.Instructions{}
+	for _, p := range parts {
+		out = append(out, p...)
+	}
+	return out
+}
+
 func TestRecursiveFunctions(t *testing.T) {
 	tests := []vmTestCase{
 		{

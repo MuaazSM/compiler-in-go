@@ -337,6 +337,14 @@ func (vm *VM) Run() error {
 				return err
 			}
 
+		case code.OpCurrentClosure:
+			// A function asking for itself, so it can call itself.
+			currentClosure := vm.currentFrame().cl
+			err := vm.push(currentClosure)
+			if err != nil {
+				return err
+			}
+
 		case code.OpNull:
 			err := vm.push(Null)
 			if err != nil {
