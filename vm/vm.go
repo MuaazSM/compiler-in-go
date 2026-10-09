@@ -352,6 +352,11 @@ func (vm *VM) Run() error {
 
 		case code.OpPop:
 			vm.pop()
+
+		default:
+			// The compiler never emits an opcode we don't handle, so this
+			// means a bug or broken bytecode. Stop rather than guess.
+			return fmt.Errorf("unknown opcode %d", op)
 		}
 	}
 

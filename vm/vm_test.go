@@ -709,6 +709,19 @@ func concat(parts ...[]byte) code.Instructions {
 	return out
 }
 
+func TestUnknownOpcodeIsAnError(t *testing.T) {
+	// 255 isn't an opcode. Skipping it silently would hide compiler bugs.
+	bytecode := &compiler.Bytecode{Instructions: code.Instructions{255}}
+
+	err := New(bytecode).Run()
+	if err == nil {
+		t.Fatalf("expected an error for an unknown opcode, got none")
+	}
+	if err.Error() != "unknown opcode 255" {
+		t.Fatalf("wrong VM error: got=%q", err)
+	}
+}
+
 func TestRecursiveFunctions(t *testing.T) {
 	tests := []vmTestCase{
 		{
