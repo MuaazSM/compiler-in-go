@@ -108,6 +108,24 @@ func (vm *VM) Run() error {
 				return err
 			}
 
+		case code.OpJump:
+			pos := int(code.ReadUint16(vm.instructions[ip+1:]))
+			// The loop adds 1 to ip right after this, so we land one byte
+			// early on purpose and the next fetch reads the target itself.
+			// Concept: instruction pointer (ip) — where in the bytecode the VM is reading right now.
+			ip = pos - 1
+
+		case code.OpJumpNotTruthy:
+			pos := int(code.ReadUint16(vm.instructions[ip+1:]))
+			// Skip the operand bytes. If we don't jump, we carry on with the
+			// instruction right after this one.
+			ip += 2
+
+			condition := vm.pop()
+			if !isTruthy(condition) {
+				ip = pos - 1
+			}
+
 		case code.OpPop:
 			vm.pop()
 		}
@@ -222,6 +240,17 @@ func (vm *VM) executeMinusOperator() error {
 
 	value := operand.(*object.Integer).Value
 	return vm.push(&object.Integer{Value: -value})
+}
+
+// isTruthy decides which way a conditional jump goes.
+// Concept: truthiness — everything counts as true except false and null.
+func isTruthy(obj object.Object) bool {
+	switch obj := obj.(type) {
+	case *object.Boolean:
+		return obj.Value
+	default:
+		return true
+	}
 }
 
 func nativeBoolToBooleanObject(input bool) *object.Boolean {
