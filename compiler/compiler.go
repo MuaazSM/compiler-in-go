@@ -94,7 +94,6 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.InfixExpression:
 		// Both sides go on the stack first (left, then right), and then the
 		// operator instruction works on whatever is at the top.
-		// Concept: stack machine — a VM that does all its work by pushing and popping values on one stack.
 
 		// `a < b` means the same as `b > a`. So we push b first, then a, and
 		// reuse OpGreaterThan. One less opcode for the VM to know about.
@@ -204,8 +203,6 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		// The value is on the stack now; store it in the name's slot. At the
 		// top level that's a global; inside a function it's a local.
-		// Concept: global binding — a variable stored in a fixed-size globals array, looked up by index.
-		// Concept: local binding — a variable that lives in the stack slots reserved for the current call.
 		if symbol.Scope == GlobalScope {
 			c.emit(code.OpSetGlobal, symbol.Index)
 		} else {
@@ -251,8 +248,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 	case *ast.StringLiteral:
 		// Strings never change, so like integers they're stored once in the
-		// pool and loaded by index.
-		// Concept: constant pool — a side list of values (numbers, strings, functions) that instructions refer to by index.
+		// constant pool and loaded by index.
 		str := &object.String{Value: node.Value}
 		c.emit(code.OpConstant, c.addConstant(str))
 

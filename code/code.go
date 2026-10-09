@@ -93,6 +93,7 @@ const (
 	OpNull
 	// OpSetGlobal pops a value into a global slot; OpGetGlobal pushes one back.
 	// The operand is the slot index the symbol table handed out.
+	// Concept: global binding — a variable stored in a fixed-size globals array, looked up by index.
 	OpGetGlobal
 	OpSetGlobal
 	// OpArray pops n elements and pushes them as one array. n is the operand.
@@ -111,6 +112,7 @@ const (
 	OpReturn
 	// OpGetLocal and OpSetLocal read and write a local variable of the
 	// running function. One byte of operand allows 256 locals per function.
+	// Concept: local binding — a variable that lives in the stack slots reserved for the current call.
 	OpGetLocal
 	OpSetLocal
 	// OpGetBuiltin pushes one of the builtin functions. The operand is its

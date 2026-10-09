@@ -106,7 +106,6 @@ func (vm *VM) StackTop() object.Object {
 
 // LastPoppedStackElem returns the value the last OpPop removed. Popping only
 // moves sp down, so that value is still sitting in the slot sp now points at.
-// Concept: stack pointer (sp) — points at the next free slot; the top value is at sp-1.
 func (vm *VM) LastPoppedStackElem() object.Object {
 	return vm.stack[vm.sp]
 }
@@ -631,8 +630,8 @@ func (vm *VM) executeIntegerComparison(op code.Opcode, left, right object.Object
 	}
 }
 
-// executeBangOperator pushes the opposite of the operand's truthiness.
-// Concept: truthiness — everything counts as true except false and null.
+// executeBangOperator pushes the opposite of the operand's truthiness, using
+// the same rule as isTruthy: only false and null are falsy.
 func (vm *VM) executeBangOperator() error {
 	operand := vm.pop()
 
