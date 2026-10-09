@@ -11,6 +11,11 @@ import (
 // StackSize caps how many values can be on the stack at once.
 const StackSize = 2048
 
+// There is only ever one true and one false. Every boolean the VM pushes is one
+// of these two, so checking whether two booleans are equal is a pointer compare.
+var True = &object.Boolean{Value: true}
+var False = &object.Boolean{Value: false}
+
 // VM executes one compiled program.
 // Concept: stack machine — a VM that does all its work by pushing and popping values on one stack.
 type VM struct {
@@ -73,6 +78,18 @@ func (vm *VM) Run() error {
 				return err
 			}
 
+		case code.OpTrue:
+			err := vm.push(True)
+			if err != nil {
+				return err
+			}
+
+		case code.OpFalse:
+			err := vm.push(False)
+			if err != nil {
+				return err
+			}
+
 		case code.OpPop:
 			vm.pop()
 		}
@@ -120,6 +137,13 @@ func (vm *VM) executeBinaryIntegerOperation(op code.Opcode, left, right object.O
 	}
 
 	return vm.push(&object.Integer{Value: result})
+}
+
+func nativeBoolToBooleanObject(input bool) *object.Boolean {
+	if input {
+		return True
+	}
+	return False
 }
 
 func (vm *VM) push(o object.Object) error {

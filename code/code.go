@@ -70,6 +70,10 @@ const (
 	OpSub
 	OpMul
 	OpDiv
+	// OpTrue and OpFalse push a boolean. The value is baked into the opcode,
+	// so they need no operand and no constant pool entry.
+	OpTrue
+	OpFalse
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -87,6 +91,8 @@ var definitions = map[Opcode]*Definition{
 	OpSub:      {"OpSub", []int{}},
 	OpMul:      {"OpMul", []int{}},
 	OpDiv:      {"OpDiv", []int{}},
+	OpTrue:     {"OpTrue", []int{}},
+	OpFalse:    {"OpFalse", []int{}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.
