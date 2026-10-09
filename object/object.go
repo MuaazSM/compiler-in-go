@@ -191,6 +191,8 @@ type CompiledFunction struct {
 	// NumLocals tells the VM how many stack slots to set aside for this
 	// function's local variables when it's called.
 	NumLocals int
+	// NumParameters is how many arguments a call has to pass.
+	NumParameters int
 }
 
 func (cf *CompiledFunction) Type() ObjectType { return COMPILED_FUNCTION_OBJ }

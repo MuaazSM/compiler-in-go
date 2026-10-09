@@ -100,7 +100,8 @@ const (
 	OpHash
 	// OpIndex pops an index and the thing being indexed, and pushes the element.
 	OpIndex
-	// OpCall calls the function sitting on top of the stack.
+	// OpCall calls a function. Its operand is how many arguments were pushed
+	// after the function itself.
 	OpCall
 	// OpReturnValue returns the value on top of the stack to the caller.
 	OpReturnValue
@@ -149,7 +150,7 @@ var definitions = map[Opcode]*Definition{
 	OpHash:  {"OpHash", []int{2}},
 	OpIndex: {"OpIndex", []int{}},
 
-	OpCall:        {"OpCall", []int{}},
+	OpCall:        {"OpCall", []int{1}},
 	OpReturnValue: {"OpReturnValue", []int{}},
 	OpReturn:      {"OpReturn", []int{}},
 

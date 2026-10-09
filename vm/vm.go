@@ -264,6 +264,9 @@ func (vm *VM) Run() error {
 		//             │ caller's data │
 		//             └───────────────┘
 		case code.OpCall:
+			// Arguments aren't passed yet; step over the count for now.
+			vm.currentFrame().ip += 1
+
 			fn, ok := vm.stack[vm.sp-1].(*object.CompiledFunction)
 			if !ok {
 				return fmt.Errorf("calling non-function")
