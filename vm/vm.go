@@ -189,12 +189,28 @@ func (vm *VM) executeBinaryOperation(op code.Opcode) error {
 	right := vm.pop()
 	left := vm.pop()
 
-	if left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ {
+	switch {
+	case left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ:
 		return vm.executeBinaryIntegerOperation(op, left, right)
+	case left.Type() == object.STRING_OBJ && right.Type() == object.STRING_OBJ:
+		return vm.executeBinaryStringOperation(op, left, right)
+	default:
+		return fmt.Errorf("unsupported types for binary operation: %s %s",
+			left.Type(), right.Type())
+	}
+}
+
+// executeBinaryStringOperation handles string + string. Nothing else makes
+// sense for strings, so any other operator is an error.
+func (vm *VM) executeBinaryStringOperation(op code.Opcode, left, right object.Object) error {
+	if op != code.OpAdd {
+		return fmt.Errorf("unknown string operator: %d", op)
 	}
 
-	return fmt.Errorf("unsupported types for binary operation: %s %s",
-		left.Type(), right.Type())
+	leftValue := left.(*object.String).Value
+	rightValue := right.(*object.String).Value
+
+	return vm.push(&object.String{Value: leftValue + rightValue})
 }
 
 func (vm *VM) executeBinaryIntegerOperation(op code.Opcode, left, right object.Object) error {

@@ -215,6 +215,13 @@ func (c *Compiler) Compile(node ast.Node) error {
 		integer := &object.Integer{Value: node.Value}
 		c.emit(code.OpConstant, c.addConstant(integer))
 
+	case *ast.StringLiteral:
+		// Strings never change, so like integers they're stored once in the
+		// pool and loaded by index.
+		// Concept: constant pool — a side list of values (numbers, strings, functions) that instructions refer to by index.
+		str := &object.String{Value: node.Value}
+		c.emit(code.OpConstant, c.addConstant(str))
+
 	case *ast.Boolean:
 		if node.Value {
 			c.emit(code.OpTrue)
