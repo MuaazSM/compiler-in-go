@@ -5,3 +5,8 @@
 /fibonacci
 *.test
 .DS_Store
+
+# Planning notes kept out of the repo
+PROMPTBOOK.md
+IMPLEMENTATION.md
+CLAUDE.md

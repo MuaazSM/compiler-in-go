@@ -112,13 +112,9 @@ stack instead of looking names up in a chain of maps.
 ## How this was built
 
 The project was built one phase at a time, test first, with the compiler and VM growing
-together:
-
-- [IMPLEMENTATION.md](IMPLEMENTATION.md) is the design and the phase-by-phase plan.
-- [PROMPTBOOK.md](PROMPTBOOK.md) holds the step-by-step prompts used for each phase, the comment
-  style and the git rules.
-
-Each finished phase is tagged in git (`phase-00` … `phase-10`).
+together: each feature got its opcode, then a compiler test and implementation, then a VM test
+and implementation. Each finished phase is tagged in git (`phase-00` … `phase-10`), so you can
+check out any tag to see the project as it was at that point.
 
 ## Credits
 
