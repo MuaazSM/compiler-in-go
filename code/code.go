@@ -82,6 +82,10 @@ const (
 	// OpMinus negates the integer on top of the stack; OpBang flips its truthiness.
 	OpMinus
 	OpBang
+	// OpJumpNotTruthy pops a value and jumps if it's falsy; OpJump always jumps.
+	// Both operands are absolute byte offsets into the instructions.
+	OpJumpNotTruthy
+	OpJump
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -108,6 +112,9 @@ var definitions = map[Opcode]*Definition{
 
 	OpMinus: {"OpMinus", []int{}},
 	OpBang:  {"OpBang", []int{}},
+
+	OpJumpNotTruthy: {"OpJumpNotTruthy", []int{2}},
+	OpJump:          {"OpJump", []int{2}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.

@@ -8,10 +8,21 @@ import (
 	"monkey/object"
 )
 
+// EmittedInstruction remembers an opcode we emitted and where it starts.
+type EmittedInstruction struct {
+	Opcode   code.Opcode
+	Position int
+}
+
 // Compiler walks the AST once and appends instructions as it goes.
 type Compiler struct {
 	instructions code.Instructions
 	constants    []object.Object
+
+	// The last two instructions we emitted. We sometimes need to take back the
+	// last one, and then the one before it becomes "last" again.
+	lastInstruction     EmittedInstruction
+	previousInstruction EmittedInstruction
 }
 
 // New returns an empty compiler.
@@ -94,6 +105,61 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return fmt.Errorf("unknown operator %s", node.Operator)
 		}
 
+	case *ast.IfExpression:
+		err := c.Compile(node.Condition)
+		if err != nil {
+			return err
+		}
+
+		// We don't know where the consequence ends yet, so we jump to a dummy
+		// address (9999) for now and fix it once we've compiled the block.
+		// Concept: back-patching — emit a placeholder jump, fill in the real target later.
+		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
+
+		err = c.Compile(node.Consequence)
+		if err != nil {
+			return err
+		}
+
+		// The block's last expression statement ends in OpPop, which would throw
+		// away the very value the `if` is supposed to produce. Drop it, so the
+		// whole `if` leaves one value behind, and the OpPop after the `if`
+		// statement cleans that up instead.
+		if c.lastInstructionIsPop() {
+			c.removeLastPop()
+		}
+
+		if node.Alternative == nil {
+			afterConsequencePos := len(c.instructions)
+			c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
+		} else {
+			// After the consequence runs, skip over the else branch.
+			jumpPos := c.emit(code.OpJump, 9999)
+
+			afterConsequencePos := len(c.instructions)
+			c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
+
+			err := c.Compile(node.Alternative)
+			if err != nil {
+				return err
+			}
+
+			if c.lastInstructionIsPop() {
+				c.removeLastPop()
+			}
+
+			afterAlternativePos := len(c.instructions)
+			c.changeOperand(jumpPos, afterAlternativePos)
+		}
+
+	case *ast.BlockStatement:
+		for _, s := range node.Statements {
+			err := c.Compile(s)
+			if err != nil {
+				return err
+			}
+		}
+
 	case *ast.PrefixExpression:
 		err := c.Compile(node.Right)
 		if err != nil {
@@ -133,10 +199,49 @@ func (c *Compiler) addConstant(obj object.Object) int {
 }
 
 // emit encodes one instruction, appends it and returns where it starts.
-// That start position matters later, when we need to go back and patch jumps.
+// That start position is what we need later to go back and patch a jump.
 func (c *Compiler) emit(op code.Opcode, operands ...int) int {
 	ins := code.Make(op, operands...)
-	return c.addInstruction(ins)
+	pos := c.addInstruction(ins)
+
+	c.setLastInstruction(op, pos)
+
+	return pos
+}
+
+func (c *Compiler) setLastInstruction(op code.Opcode, pos int) {
+	previous := c.lastInstruction
+	last := EmittedInstruction{Opcode: op, Position: pos}
+
+	c.previousInstruction = previous
+	c.lastInstruction = last
+}
+
+func (c *Compiler) lastInstructionIsPop() bool {
+	return c.lastInstruction.Opcode == code.OpPop
+}
+
+// removeLastPop chops the trailing OpPop off the instructions. The instruction
+// before it becomes the last one again, so a later check doesn't see a stale OpPop.
+func (c *Compiler) removeLastPop() {
+	c.instructions = c.instructions[:c.lastInstruction.Position]
+	c.lastInstruction = c.previousInstruction
+}
+
+// replaceInstruction overwrites bytes in place. It's only safe when the new
+// instruction is the same length as the old one, which is true for patching operands.
+func (c *Compiler) replaceInstruction(pos int, newInstruction []byte) {
+	for i := 0; i < len(newInstruction); i++ {
+		c.instructions[pos+i] = newInstruction[i]
+	}
+}
+
+// changeOperand rebuilds the instruction at opPos with a new operand.
+func (c *Compiler) changeOperand(opPos int, operand int) {
+	op := code.Opcode(c.instructions[opPos])
+	newInstruction := code.Make(op, operand)
+
+	c.replaceInstruction(opPos, newInstruction)
 }
 
 func (c *Compiler) addInstruction(ins []byte) int {
