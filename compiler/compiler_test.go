@@ -7,6 +7,7 @@ import (
 	"monkey/lexer"
 	"monkey/object"
 	"monkey/parser"
+	"strings"
 	"testing"
 )
 
@@ -1097,6 +1098,95 @@ func TestLetCannotReadItself(t *testing.T) {
 		}
 		if err.Error() != "undefined variable "+tt.name {
 			t.Errorf("wrong error for %q: %q", tt.input, err)
+		}
+	}
+}
+
+// varName turns 0, 1, 2, ... into va, vb, ..., vba, ... since Monkey
+// identifiers can only contain letters.
+func varName(i int) string {
+	name := ""
+	for {
+		name = string(rune('a'+i%26)) + name
+		i /= 26
+		if i == 0 {
+			return "v" + name
+		}
+	}
+}
+
+// manyLets returns n `let` statements: let va = 0; let vb = 0; ...
+func manyLets(n int) string {
+	var b strings.Builder
+	for i := 0; i < n; i++ {
+		fmt.Fprintf(&b, "let %s = 0; ", varName(i))
+	}
+	return b.String()
+}
+
+// repeat returns n copies of item joined by sep.
+func repeat(item, sep string, n int) string {
+	return strings.TrimSuffix(strings.Repeat(item+sep, n), sep)
+}
+
+func TestOperandLimits(t *testing.T) {
+	// Every case sits right at a limit (must compile) or one past it (must
+	// fail with a clear error instead of silently wrapping the number).
+	freeVars := make([]string, 256)
+	for i := range freeVars {
+		freeVars[i] = varName(i)
+	}
+
+	tests := []struct {
+		name    string
+		input   string
+		wantErr string // "" means it should compile
+	}{
+		{"256 locals", "fn() { " + manyLets(256) + "}", ""},
+		{"257 locals", "fn() { " + manyLets(257) + "}",
+			"too many local variables in one function (max 256)"},
+		{"255 arguments", "len(" + repeat("0", ", ", 255) + ")", ""},
+		{"256 arguments", "len(" + repeat("0", ", ", 256) + ")",
+			"too many arguments in one call (max 255)"},
+		{"255 captured", "fn() { " + manyLets(255) + "fn() { " +
+			strings.Join(freeVars[:255], " + ") + " } }", ""},
+		{"256 captured", "fn() { " + manyLets(256) + "fn() { " +
+			strings.Join(freeVars, " + ") + " } }",
+			"a function captures too many variables (max 255)"},
+		{"65536 constants", "[" + repeat("1", ",", 65535) + "]", ""},
+		{"65537 constants", "[" + repeat("1", ",", 65537) + "]",
+			"too many constants in one program (max 65536)"},
+		{"65536 array elements", "[" + repeat("true", ",", 65536) + "]",
+			"array literal has too many elements (max 65535)"},
+		// Each `true;` is two bytes of bytecode, so this body is over 64 KB
+		// and the jump past it can't be encoded in two bytes.
+		{"jump past 64KB", "if (true) { " + strings.Repeat("true; ", 33000) + "}",
+			"program too large: a jump target is past 65535 bytes"},
+	}
+
+	for _, tt := range tests {
+		p := parser.New(lexer.New(tt.input))
+		program := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Fatalf("%s: test input doesn't parse: %v", tt.name, p.Errors()[0])
+		}
+
+		compiler := New()
+		err := compiler.Compile(program)
+
+		if tt.wantErr == "" {
+			if err != nil {
+				t.Errorf("%s: unexpected compile error: %s", tt.name, err)
+			}
+			continue
+		}
+
+		if err == nil {
+			t.Errorf("%s: expected error %q, got none", tt.name, tt.wantErr)
+			continue
+		}
+		if err.Error() != tt.wantErr {
+			t.Errorf("%s: wrong error. want=%q, got=%q", tt.name, tt.wantErr, err)
 		}
 	}
 }

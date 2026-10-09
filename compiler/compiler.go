@@ -37,6 +37,10 @@ type Compiler struct {
 	// literal we're inside of adds one on top.
 	scopes     []CompilationScope
 	scopeIndex int
+
+	// err holds the first operand that didn't fit its instruction (see
+	// emit). Compile hands it back once the current node is done.
+	err error
 }
 
 // New returns an empty compiler.
@@ -394,7 +398,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.emit(code.OpCall, len(node.Arguments))
 	}
 
-	return nil
+	return c.err
 }
 
 // addConstant stores obj in the constant pool and returns its index.
@@ -406,12 +410,67 @@ func (c *Compiler) addConstant(obj object.Object) int {
 // emit encodes one instruction, appends it to the current scope and returns
 // where it starts. That position is what we need later to patch a jump.
 func (c *Compiler) emit(op code.Opcode, operands ...int) int {
+	c.checkOperands(op, operands...)
+
 	ins := code.Make(op, operands...)
 	pos := c.addInstruction(ins)
 
 	c.setLastInstruction(op, pos)
 
 	return pos
+}
+
+// checkOperands makes sure every operand fits in the bytes its instruction
+// has for it. code.Make would quietly cut a too-big number down (local 257
+// would turn into local 1), so we catch it here and turn it into an error.
+// Only the first problem is kept.
+func (c *Compiler) checkOperands(op code.Opcode, operands ...int) {
+	if c.err != nil {
+		return
+	}
+
+	def, err := code.Lookup(byte(op))
+	if err != nil {
+		c.err = err
+		return
+	}
+
+	for i, width := range def.OperandWidths {
+		if i >= len(operands) {
+			break
+		}
+
+		max := 1<<(8*width) - 1
+		if operands[i] < 0 || operands[i] > max {
+			c.err = operandTooBig(op, i, operands[i], max)
+			return
+		}
+	}
+}
+
+// operandTooBig explains in plain words which limit a program ran into.
+func operandTooBig(op code.Opcode, operandIndex, value, max int) error {
+	switch {
+	case op == code.OpConstant || (op == code.OpClosure && operandIndex == 0):
+		return fmt.Errorf("too many constants in one program (max %d)", max+1)
+	case op == code.OpGetGlobal || op == code.OpSetGlobal:
+		return fmt.Errorf("too many global variables (max %d)", max+1)
+	case op == code.OpGetLocal || op == code.OpSetLocal:
+		return fmt.Errorf("too many local variables in one function (max %d)", max+1)
+	case op == code.OpCall:
+		return fmt.Errorf("too many arguments in one call (max %d)", max)
+	case op == code.OpGetFree || op == code.OpClosure:
+		return fmt.Errorf("a function captures too many variables (max %d)", max)
+	case op == code.OpArray:
+		return fmt.Errorf("array literal has too many elements (max %d)", max)
+	case op == code.OpHash:
+		return fmt.Errorf("hash literal has too many pairs (max %d)", max/2)
+	case op == code.OpJump || op == code.OpJumpNotTruthy:
+		return fmt.Errorf("program too large: a jump target is past %d bytes", max)
+	default:
+		def, _ := code.Lookup(byte(op))
+		return fmt.Errorf("%s operand %d is too big (max %d)", def.Name, value, max)
+	}
 }
 
 func (c *Compiler) currentInstructions() code.Instructions {
@@ -479,6 +538,7 @@ func (c *Compiler) replaceInstruction(pos int, newInstruction []byte) {
 // changeOperand rebuilds the instruction at opPos with a new operand.
 func (c *Compiler) changeOperand(opPos int, operand int) {
 	op := code.Opcode(c.currentInstructions()[opPos])
+	c.checkOperands(op, operand)
 	newInstruction := code.Make(op, operand)
 
 	c.replaceInstruction(opPos, newInstruction)
