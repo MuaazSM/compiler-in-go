@@ -287,6 +287,41 @@ func TestUndefinedVariable(t *testing.T) {
 	}
 }
 
+func TestNewWithStateKeepsNamesAndConstants(t *testing.T) {
+	symbolTable := NewSymbolTable()
+	constants := []object.Object{}
+
+	first := NewWithState(symbolTable, constants)
+	if err := first.Compile(parse("let a = 1;")); err != nil {
+		t.Fatalf("compiler error: %s", err)
+	}
+	constants = first.Bytecode().Constants
+
+	// A second compiler sharing the same state should know about `a`, and its
+	// new constant should land after the first one in the pool.
+	second := NewWithState(symbolTable, constants)
+	if err := second.Compile(parse("a + 2;")); err != nil {
+		t.Fatalf("compiler error: %s", err)
+	}
+
+	bytecode := second.Bytecode()
+
+	err := testInstructions([]code.Instructions{
+		code.Make(code.OpGetGlobal, 0),
+		code.Make(code.OpConstant, 1),
+		code.Make(code.OpAdd),
+		code.Make(code.OpPop),
+	}, bytecode.Instructions)
+	if err != nil {
+		t.Fatalf("testInstructions failed: %s", err)
+	}
+
+	err = testConstants([]interface{}{1, 2}, bytecode.Constants)
+	if err != nil {
+		t.Fatalf("testConstants failed: %s", err)
+	}
+}
+
 func runCompilerTests(t *testing.T, tests []compilerTestCase) {
 	t.Helper()
 

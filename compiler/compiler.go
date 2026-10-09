@@ -36,6 +36,16 @@ func New() *Compiler {
 	}
 }
 
+// NewWithState returns a compiler that carries on from earlier ones, reusing
+// their names and constant pool. The REPL uses this so each line can see what
+// earlier lines defined.
+func NewWithState(s *SymbolTable, constants []object.Object) *Compiler {
+	compiler := New()
+	compiler.symbolTable = s
+	compiler.constants = constants
+	return compiler
+}
+
 // Compile emits bytecode for node and everything below it.
 func (c *Compiler) Compile(node ast.Node) error {
 	switch node := node.(type) {

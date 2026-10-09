@@ -51,6 +51,14 @@ func New(bytecode *compiler.Bytecode) *VM {
 	}
 }
 
+// NewWithGlobalsStore is New, but with a globals slice the caller keeps. Passing
+// the same slice to the next VM lets it see globals set by the previous one.
+func NewWithGlobalsStore(bytecode *compiler.Bytecode, s []object.Object) *VM {
+	vm := New(bytecode)
+	vm.globals = s
+	return vm
+}
+
 // StackTop returns the value on top of the stack, or nil if it's empty.
 func (vm *VM) StackTop() object.Object {
 	if vm.sp == 0 {
@@ -148,7 +156,15 @@ func (vm *VM) Run() error {
 			globalIndex := code.ReadUint16(vm.instructions[ip+1:])
 			ip += 2
 
-			err := vm.push(vm.globals[globalIndex])
+			// A compiled program always sets a global before reading it. Only
+			// the REPL can get here with an empty slot, when a line named a
+			// global but then failed to compile, so it never stored a value.
+			value := vm.globals[globalIndex]
+			if value == nil {
+				return fmt.Errorf("global %d was never set", globalIndex)
+			}
+
+			err := vm.push(value)
 			if err != nil {
 				return err
 			}

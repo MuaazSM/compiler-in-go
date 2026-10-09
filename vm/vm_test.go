@@ -3,6 +3,7 @@ package vm
 import (
 	"fmt"
 	"monkey/ast"
+	"monkey/code"
 	"monkey/compiler"
 	"monkey/lexer"
 	"monkey/object"
@@ -99,6 +100,42 @@ func TestGlobalLetStatements(t *testing.T) {
 	}
 
 	runVmTests(t, tests)
+}
+
+func TestGlobalsPersistAcrossRuns(t *testing.T) {
+	symbolTable := compiler.NewSymbolTable()
+	constants := []object.Object{}
+	globals := make([]object.Object, GlobalsSize)
+
+	var last object.Object
+	for _, line := range []string{"let a = 5;", "let b = a * 2;", "a + b"} {
+		comp := compiler.NewWithState(symbolTable, constants)
+		if err := comp.Compile(parse(line)); err != nil {
+			t.Fatalf("compiler error on %q: %s", line, err)
+		}
+		constants = comp.Bytecode().Constants
+
+		machine := NewWithGlobalsStore(comp.Bytecode(), globals)
+		if err := machine.Run(); err != nil {
+			t.Fatalf("vm error on %q: %s", line, err)
+		}
+		last = machine.LastPoppedStackElem()
+	}
+
+	testExpectedObject(t, 15, last)
+}
+
+func TestReadingUnsetGlobalIsAnError(t *testing.T) {
+	// The REPL can end up here: `let c = 1; oops` fails to compile after `c`
+	// was named, so a later line reads a slot nothing ever wrote to.
+	bytecode := &compiler.Bytecode{
+		Instructions: code.Make(code.OpGetGlobal, 0),
+	}
+
+	err := NewWithGlobalsStore(bytecode, make([]object.Object, GlobalsSize)).Run()
+	if err == nil {
+		t.Fatalf("expected an error for an unset global, got none")
+	}
 }
 
 func runVmTests(t *testing.T, tests []vmTestCase) {
