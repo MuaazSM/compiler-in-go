@@ -95,6 +95,9 @@ const (
 	OpSetGlobal
 	// OpArray pops n elements and pushes them as one array. n is the operand.
 	OpArray
+	// OpHash pops n values (key, value, key, value, ...) and pushes a hash.
+	// n counts keys and values together, so it's twice the number of pairs.
+	OpHash
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -131,6 +134,7 @@ var definitions = map[Opcode]*Definition{
 	OpSetGlobal: {"OpSetGlobal", []int{2}},
 
 	OpArray: {"OpArray", []int{2}},
+	OpHash:  {"OpHash", []int{2}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.
