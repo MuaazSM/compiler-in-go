@@ -325,6 +325,78 @@ func TestFirstClassFunctions(t *testing.T) {
 			`,
 			expected: 1,
 		},
+		{
+			input: `
+			let returnsOneReturner = fn() {
+				let returnsOne = fn() { 1; };
+				returnsOne;
+			};
+			returnsOneReturner()();
+			`,
+			expected: 1,
+		},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestCallingFunctionsWithBindings(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+			let one = fn() { let one = 1; one };
+			one();
+			`,
+			expected: 1,
+		},
+		{
+			input: `
+			let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };
+			oneAndTwo();
+			`,
+			expected: 3,
+		},
+		{
+			input: `
+			let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };
+			let threeAndFour = fn() { let three = 3; let four = 4; three + four; };
+			oneAndTwo() + threeAndFour();
+			`,
+			expected: 10,
+		},
+		{
+			// Same local name in two functions: each call gets its own slot.
+			input: `
+			let firstFoobar = fn() { let foobar = 50; foobar; };
+			let secondFoobar = fn() { let foobar = 100; foobar; };
+			firstFoobar() + secondFoobar();
+			`,
+			expected: 150,
+		},
+		{
+			input: `
+			let globalSeed = 50;
+			let minusOne = fn() {
+				let num = 1;
+				globalSeed - num;
+			}
+			let minusTwo = fn() {
+				let num = 2;
+				globalSeed - num;
+			}
+			minusOne() + minusTwo();
+			`,
+			expected: 97,
+		},
+		{
+			// A local in the caller must survive a call that uses its own locals.
+			input: `
+			let inner = fn() { let x = 100; x };
+			let outer = fn() { let y = 1; inner(); y };
+			outer();
+			`,
+			expected: 1,
+		},
 	}
 
 	runVmTests(t, tests)
@@ -347,12 +419,12 @@ func TestTooManyFrames(t *testing.T) {
 
 	// The main frame already takes one slot.
 	for i := 1; i < MaxFrames; i++ {
-		if err := vm.pushFrame(NewFrame(fn)); err != nil {
+		if err := vm.pushFrame(NewFrame(fn, 0)); err != nil {
 			t.Fatalf("pushFrame %d failed early: %s", i, err)
 		}
 	}
 
-	if err := vm.pushFrame(NewFrame(fn)); err == nil {
+	if err := vm.pushFrame(NewFrame(fn, 0)); err == nil {
 		t.Fatalf("expected an error past MaxFrames, got none")
 	}
 }

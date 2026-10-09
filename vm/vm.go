@@ -50,7 +50,7 @@ func New(bytecode *compiler.Bytecode) *VM {
 	// of a function nobody called. That way the run loop always reads from
 	// "the current frame" and never needs a separate path for the main code.
 	mainFn := &object.CompiledFunction{Instructions: bytecode.Instructions}
-	mainFrame := NewFrame(mainFn)
+	mainFrame := NewFrame(mainFn, 0)
 
 	frames := make([]*Frame, MaxFrames)
 	frames[0] = mainFrame
@@ -250,18 +250,37 @@ func (vm *VM) Run() error {
 				return err
 			}
 
+		// While a function runs, the stack looks like this. Everything from
+		// basePointer up belongs to the call. With no arguments yet,
+		// basePointer sits right above the callee.
+		//
+		//             ┌───────────────┐
+		//  sp ──────▶ │               │
+		//             │ local k       │
+		//             │ ...           │
+		//             │ arg n-1       │
+		//             │ arg 0         │ ◀── basePointer
+		//             │ callee (fn)   │
+		//             │ caller's data │
+		//             └───────────────┘
 		case code.OpCall:
 			fn, ok := vm.stack[vm.sp-1].(*object.CompiledFunction)
 			if !ok {
 				return fmt.Errorf("calling non-function")
 			}
 
-			// The function stays on the stack while it runs; we clear it
-			// away when it returns.
-			err := vm.pushFrame(NewFrame(fn))
+			frame := NewFrame(fn, vm.sp)
+			err := vm.pushFrame(frame)
 			if err != nil {
 				return err
 			}
+
+			// Bump sp past the local slots so pushes during the call
+			// can't land on top of them.
+			if frame.basePointer+fn.NumLocals > StackSize {
+				return fmt.Errorf("stack overflow")
+			}
+			vm.sp = frame.basePointer + fn.NumLocals
 
 		case code.OpReturnValue:
 			returnValue := vm.pop()
@@ -272,9 +291,11 @@ func (vm *VM) Run() error {
 				return nil
 			}
 
-			vm.popFrame()
-			// Throw away the function we just called.
-			vm.pop()
+			// The callee sits one slot below basePointer. Dropping sp to
+			// basePointer-1 throws away the locals and the callee in one go,
+			// leaving the stack exactly as it was before the call.
+			frame := vm.popFrame()
+			vm.sp = frame.basePointer - 1
 
 			err := vm.push(returnValue)
 			if err != nil {
@@ -282,10 +303,27 @@ func (vm *VM) Run() error {
 			}
 
 		case code.OpReturn:
-			vm.popFrame()
-			vm.pop()
+			frame := vm.popFrame()
+			vm.sp = frame.basePointer - 1
 
 			err := vm.push(Null)
+			if err != nil {
+				return err
+			}
+
+		case code.OpSetLocal:
+			localIndex := code.ReadUint8(ins[ip+1:])
+			vm.currentFrame().ip += 1
+
+			frame := vm.currentFrame()
+			vm.stack[frame.basePointer+int(localIndex)] = vm.pop()
+
+		case code.OpGetLocal:
+			localIndex := code.ReadUint8(ins[ip+1:])
+			vm.currentFrame().ip += 1
+
+			frame := vm.currentFrame()
+			err := vm.push(vm.stack[frame.basePointer+int(localIndex)])
 			if err != nil {
 				return err
 			}
