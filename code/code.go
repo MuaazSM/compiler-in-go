@@ -86,6 +86,9 @@ const (
 	// Both operands are absolute byte offsets into the instructions.
 	OpJumpNotTruthy
 	OpJump
+	// OpNull pushes null, e.g. as the value of an `if` whose condition was false
+	// and that has no else.
+	OpNull
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -115,6 +118,8 @@ var definitions = map[Opcode]*Definition{
 
 	OpJumpNotTruthy: {"OpJumpNotTruthy", []int{2}},
 	OpJump:          {"OpJump", []int{2}},
+
+	OpNull: {"OpNull", []int{}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.

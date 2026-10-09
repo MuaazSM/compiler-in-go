@@ -183,15 +183,19 @@ func TestConditionals(t *testing.T) {
 			expectedInstructions: []code.Instructions{
 				// 0000
 				code.Make(code.OpTrue),
-				// 0001: skip the consequence when the condition is falsy
-				code.Make(code.OpJumpNotTruthy, 7),
+				// 0001: falsy condition goes to the implicit else
+				code.Make(code.OpJumpNotTruthy, 10),
 				// 0004
 				code.Make(code.OpConstant, 0),
 				// 0007
-				code.Make(code.OpPop),
-				// 0008
-				code.Make(code.OpConstant, 1),
+				code.Make(code.OpJump, 11),
+				// 0010: no else was written, so the `if` produces null
+				code.Make(code.OpNull),
 				// 0011
+				code.Make(code.OpPop),
+				// 0012
+				code.Make(code.OpConstant, 1),
+				// 0015
 				code.Make(code.OpPop),
 			},
 		},

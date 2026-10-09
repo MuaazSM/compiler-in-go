@@ -16,6 +16,9 @@ const StackSize = 2048
 var True = &object.Boolean{Value: true}
 var False = &object.Boolean{Value: false}
 
+// Null is the only null value, for the same reason.
+var Null = &object.Null{}
+
 // VM executes one compiled program.
 // Concept: stack machine — a VM that does all its work by pushing and popping values on one stack.
 type VM struct {
@@ -126,6 +129,12 @@ func (vm *VM) Run() error {
 				ip = pos - 1
 			}
 
+		case code.OpNull:
+			err := vm.push(Null)
+			if err != nil {
+				return err
+			}
+
 		case code.OpPop:
 			vm.pop()
 		}
@@ -225,6 +234,8 @@ func (vm *VM) executeBangOperator() error {
 		return vm.push(False)
 	case False:
 		return vm.push(True)
+	case Null:
+		return vm.push(True)
 	default:
 		// Any other value (like 5) is truthy, so its opposite is false.
 		return vm.push(False)
@@ -248,6 +259,8 @@ func isTruthy(obj object.Object) bool {
 	switch obj := obj.(type) {
 	case *object.Boolean:
 		return obj.Value
+	case *object.Null:
+		return false
 	default:
 		return true
 	}

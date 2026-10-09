@@ -68,6 +68,7 @@ func TestBooleanExpressions(t *testing.T) {
 		{"!!5", true},
 		{"-(5 + 10 * 2) == -25", true},
 		{"!(1 < 2) == false", true},
+		{"!(if (false) { 5; })", true},
 	}
 
 	runVmTests(t, tests)
@@ -82,6 +83,9 @@ func TestConditionals(t *testing.T) {
 		{"if (1 < 2) { 10 }", 10},
 		{"if (1 < 2) { 10 } else { 20 }", 10},
 		{"if (1 > 2) { 10 } else { 20 }", 20},
+		{"if (1 > 2) { 10 }", Null},
+		{"if (false) { 10 }", Null},
+		{"if ((if (false) { 10 })) { 10 } else { 20 }", 20},
 	}
 
 	runVmTests(t, tests)
@@ -132,6 +136,10 @@ func testExpectedObject(t *testing.T, expected interface{}, actual object.Object
 		err := testBooleanObject(expected, actual)
 		if err != nil {
 			t.Errorf("testBooleanObject failed: %s", err)
+		}
+	case *object.Null:
+		if actual != Null {
+			t.Errorf("object is not Null: %T (%+v)", actual, actual)
 		}
 	default:
 		t.Errorf("unsupported expected type %T", expected)
