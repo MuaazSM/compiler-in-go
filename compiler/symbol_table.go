@@ -7,6 +7,7 @@ type SymbolScope string
 
 const (
 	GlobalScope SymbolScope = "GLOBAL"
+	LocalScope  SymbolScope = "LOCAL"
 )
 
 // Symbol is everything the compiler needs to know about a name.
@@ -20,6 +21,9 @@ type Symbol struct {
 // VM can find values by number instead of by string.
 // Concept: symbol table — the compiler's address book: name → (scope, index).
 type SymbolTable struct {
+	// Outer is the table of the enclosing code. It's nil for the global table.
+	Outer *SymbolTable
+
 	store          map[string]Symbol
 	numDefinitions int
 }
@@ -30,17 +34,36 @@ func NewSymbolTable() *SymbolTable {
 	return &SymbolTable{store: s}
 }
 
-// Define records a name and gives it the next free index. Defining the same
-// name again gives it a fresh index; the old slot is simply never read again.
+// NewEnclosedSymbolTable returns a table for a function body, nested inside outer.
+func NewEnclosedSymbolTable(outer *SymbolTable) *SymbolTable {
+	s := NewSymbolTable()
+	s.Outer = outer
+	return s
+}
+
+// Define records a name and gives it the next free index. A table with no
+// Outer is the global one; any other table belongs to a function, so its
+// names are locals. Defining the same name again gives it a fresh index; the
+// old slot is simply never read again.
 func (s *SymbolTable) Define(name string) Symbol {
-	symbol := Symbol{Name: name, Index: s.numDefinitions, Scope: GlobalScope}
+	symbol := Symbol{Name: name, Index: s.numDefinitions}
+	if s.Outer == nil {
+		symbol.Scope = GlobalScope
+	} else {
+		symbol.Scope = LocalScope
+	}
+
 	s.store[name] = symbol
 	s.numDefinitions++
 	return symbol
 }
 
-// Resolve looks a name up. The bool is false if it was never defined.
+// Resolve looks a name up here first, then in each enclosing table in turn.
+// The bool is false if no table has it.
 func (s *SymbolTable) Resolve(name string) (Symbol, bool) {
 	obj, ok := s.store[name]
+	if !ok && s.Outer != nil {
+		return s.Outer.Resolve(name)
+	}
 	return obj, ok
 }
