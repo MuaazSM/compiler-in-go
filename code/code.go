@@ -98,6 +98,8 @@ const (
 	// OpHash pops n values (key, value, key, value, ...) and pushes a hash.
 	// n counts keys and values together, so it's twice the number of pairs.
 	OpHash
+	// OpIndex pops an index and the thing being indexed, and pushes the element.
+	OpIndex
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -135,6 +137,7 @@ var definitions = map[Opcode]*Definition{
 
 	OpArray: {"OpArray", []int{2}},
 	OpHash:  {"OpHash", []int{2}},
+	OpIndex: {"OpIndex", []int{}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.

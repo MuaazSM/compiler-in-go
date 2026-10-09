@@ -202,6 +202,44 @@ func TestUnhashableHashKeyIsAnError(t *testing.T) {
 	}
 }
 
+func TestIndexExpressions(t *testing.T) {
+	tests := []vmTestCase{
+		{"[1, 2, 3][1]", 2},
+		{"[1, 2, 3][0 + 2]", 3},
+		{"[[1, 1, 1]][0][0]", 1},
+		{"[][0]", Null},
+		{"[1, 2, 3][99]", Null},
+		{"[1][-1]", Null},
+		{"{1: 1, 2: 2}[1]", 1},
+		{"{1: 1, 2: 2}[2]", 2},
+		{"{1: 1}[0]", Null},
+		{"{}[0]", Null},
+		{`{"one": 1}["one"]`, 1},
+		{"{true: 5}[true]", 5},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestIndexErrors(t *testing.T) {
+	inputs := []string{
+		"{1: 1}[[1]]",  // arrays can't be hash keys
+		"1[0]",         // integers can't be indexed
+		"[1, 2][true]", // arrays need an integer index
+	}
+
+	for _, input := range inputs {
+		comp := compiler.New()
+		if err := comp.Compile(parse(input)); err != nil {
+			t.Fatalf("compiler error on %q: %s", input, err)
+		}
+
+		if err := New(comp.Bytecode()).Run(); err == nil {
+			t.Errorf("expected an error for %q, got none", input)
+		}
+	}
+}
+
 func runVmTests(t *testing.T, tests []vmTestCase) {
 	t.Helper()
 
