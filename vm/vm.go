@@ -300,7 +300,15 @@ func (vm *VM) Run() error {
 			vm.currentFrame().ip += 1
 
 			frame := vm.currentFrame()
-			err := vm.push(vm.stack[frame.basePointer+int(localIndex)])
+			value := vm.stack[frame.basePointer+int(localIndex)]
+			// Every local slot starts out nil (see callClosure), and nothing
+			// else ever stores nil. So nil here means a `let` that didn't run,
+			// like one inside an `if` branch that was skipped.
+			if value == nil {
+				return fmt.Errorf("local %d was never set", localIndex)
+			}
+
+			err := vm.push(value)
 			if err != nil {
 				return err
 			}
@@ -467,6 +475,13 @@ func (vm *VM) callClosure(cl *object.Closure, numArgs int) error {
 	// can't land on top of them. NumLocals already counts the parameters.
 	if frame.basePointer+fn.NumLocals > StackSize {
 		return fmt.Errorf("stack overflow")
+	}
+
+	// Those slots still hold whatever an earlier call left there. Wipe them,
+	// so a local that never gets set reads as "unset" instead of quietly
+	// picking up an old value. The arguments below them are kept.
+	for i := vm.sp; i < frame.basePointer+fn.NumLocals; i++ {
+		vm.stack[i] = nil
 	}
 	vm.sp = frame.basePointer + fn.NumLocals
 

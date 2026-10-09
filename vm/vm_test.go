@@ -733,6 +733,37 @@ func TestLetSeesPreviousBinding(t *testing.T) {
 	runVmTests(t, tests)
 }
 
+func TestReadingUnsetLocalIsAnError(t *testing.T) {
+	// `a` is defined in a branch that didn't run, so its slot was never
+	// written. The second input is the sneaky one: the first call leaves 42
+	// behind in that slot, and the second call must not pick it up.
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"let g = fn() { if (false) { let a = 1; } a }; g()", "local 0 was never set"},
+		{"let h = fn() { if (false) { let a = 1; } a + 1 }; h()", "local 0 was never set"},
+		// `set` is local 0 here, so `a` is local 1.
+		{"let f = fn(set) { if (set) { let a = 42; } a }; f(true); f(false)", "local 1 was never set"},
+	}
+
+	for _, tt := range tests {
+		comp := compiler.New()
+		if err := comp.Compile(parse(tt.input)); err != nil {
+			t.Fatalf("compiler error on %q: %s", tt.input, err)
+		}
+
+		err := New(comp.Bytecode()).Run()
+		if err == nil {
+			t.Errorf("expected an error for %q, got none", tt.input)
+			continue
+		}
+		if err.Error() != tt.expected {
+			t.Errorf("wrong VM error for %q: want=%q, got=%q", tt.input, tt.expected, err)
+		}
+	}
+}
+
 func TestRecursiveFunctions(t *testing.T) {
 	tests := []vmTestCase{
 		{
