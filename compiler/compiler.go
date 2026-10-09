@@ -316,6 +316,15 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.FunctionLiteral:
 		c.enterScope()
 
+		// Inside a closure, a function that calls itself would have to
+		// capture its own value, but that value doesn't exist yet: the
+		// closure is still being built. So instead we teach the body that
+		// its own name means "whatever closure is running right now",
+		// which the VM can always answer.
+		if node.Name != "" {
+			c.symbolTable.DefineFunctionName(node.Name)
+		}
+
 		// Define the parameters first, so they get locals 0..n-1. The VM
 		// relies on that: it leaves the arguments in exactly those slots.
 		for _, p := range node.Parameters {
@@ -489,6 +498,8 @@ func (c *Compiler) loadSymbol(s Symbol) {
 		c.emit(code.OpGetBuiltin, s.Index)
 	case FreeScope:
 		c.emit(code.OpGetFree, s.Index)
+	case FunctionScope:
+		c.emit(code.OpCurrentClosure)
 	}
 }
 

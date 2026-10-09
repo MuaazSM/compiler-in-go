@@ -6,10 +6,11 @@ package compiler
 type SymbolScope string
 
 const (
-	GlobalScope  SymbolScope = "GLOBAL"
-	LocalScope   SymbolScope = "LOCAL"
-	BuiltinScope SymbolScope = "BUILTIN"
-	FreeScope    SymbolScope = "FREE"
+	GlobalScope   SymbolScope = "GLOBAL"
+	LocalScope    SymbolScope = "LOCAL"
+	BuiltinScope  SymbolScope = "BUILTIN"
+	FreeScope     SymbolScope = "FREE"
+	FunctionScope SymbolScope = "FUNCTION"
 )
 
 // Symbol is everything the compiler needs to know about a name.
@@ -69,6 +70,16 @@ func (s *SymbolTable) Define(name string) Symbol {
 // It doesn't bump numDefinitions: builtins don't take up a global or local slot.
 func (s *SymbolTable) DefineBuiltin(index int, name string) Symbol {
 	symbol := Symbol{Name: name, Index: index, Scope: BuiltinScope}
+	s.store[name] = symbol
+	return symbol
+}
+
+// DefineFunctionName records the name of the function this table belongs to,
+// so its body can call itself. It takes no slot, and a later Define of the
+// same name replaces it, so a parameter or local can shadow the function.
+// Concept: self-reference — a function referring to itself by name (recursion) before it's fully bound.
+func (s *SymbolTable) DefineFunctionName(name string) Symbol {
+	symbol := Symbol{Name: name, Index: 0, Scope: FunctionScope}
 	s.store[name] = symbol
 	return symbol
 }
