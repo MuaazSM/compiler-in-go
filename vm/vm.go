@@ -11,6 +11,11 @@ import (
 // StackSize caps how many values can be on the stack at once.
 const StackSize = 2048
 
+// GlobalsSize is how many global slots there are. The global index travels in a
+// 2-byte operand, and 65536 is how many different values two bytes can hold,
+// so every index the compiler can emit has a slot.
+const GlobalsSize = 65536
+
 // There is only ever one true and one false. Every boolean the VM pushes is one
 // of these two, so checking whether two booleans are equal is a pointer compare.
 var True = &object.Boolean{Value: true}
@@ -29,6 +34,8 @@ type VM struct {
 	// sp is the slot the next push will fill, so the top value lives at sp-1.
 	// Concept: stack pointer (sp) — points at the next free slot; the top value is at sp-1.
 	sp int
+
+	globals []object.Object
 }
 
 // New sets up a VM for the given bytecode with an empty stack.
@@ -39,6 +46,8 @@ func New(bytecode *compiler.Bytecode) *VM {
 
 		stack: make([]object.Object, StackSize),
 		sp:    0,
+
+		globals: make([]object.Object, GlobalsSize),
 	}
 }
 
@@ -127,6 +136,21 @@ func (vm *VM) Run() error {
 			condition := vm.pop()
 			if !isTruthy(condition) {
 				ip = pos - 1
+			}
+
+		case code.OpSetGlobal:
+			globalIndex := code.ReadUint16(vm.instructions[ip+1:])
+			ip += 2
+
+			vm.globals[globalIndex] = vm.pop()
+
+		case code.OpGetGlobal:
+			globalIndex := code.ReadUint16(vm.instructions[ip+1:])
+			ip += 2
+
+			err := vm.push(vm.globals[globalIndex])
+			if err != nil {
+				return err
 			}
 
 		case code.OpNull:
