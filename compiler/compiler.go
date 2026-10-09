@@ -47,6 +47,24 @@ func (c *Compiler) Compile(node ast.Node) error {
 		// Both sides go on the stack first (left, then right), and then the
 		// operator instruction works on whatever is at the top.
 		// Concept: stack machine — a VM that does all its work by pushing and popping values on one stack.
+
+		// `a < b` means the same as `b > a`. So we push b first, then a, and
+		// reuse OpGreaterThan. One less opcode for the VM to know about.
+		if node.Operator == "<" {
+			err := c.Compile(node.Right)
+			if err != nil {
+				return err
+			}
+
+			err = c.Compile(node.Left)
+			if err != nil {
+				return err
+			}
+
+			c.emit(code.OpGreaterThan)
+			return nil
+		}
+
 		err := c.Compile(node.Left)
 		if err != nil {
 			return err
@@ -66,6 +84,12 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpMul)
 		case "/":
 			c.emit(code.OpDiv)
+		case ">":
+			c.emit(code.OpGreaterThan)
+		case "==":
+			c.emit(code.OpEqual)
+		case "!=":
+			c.emit(code.OpNotEqual)
 		default:
 			return fmt.Errorf("unknown operator %s", node.Operator)
 		}

@@ -74,6 +74,11 @@ const (
 	// so they need no operand and no constant pool entry.
 	OpTrue
 	OpFalse
+	// Comparisons pop two values and push a boolean. There's no OpLessThan:
+	// the compiler swaps the operands and uses OpGreaterThan instead.
+	OpEqual
+	OpNotEqual
+	OpGreaterThan
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -93,6 +98,10 @@ var definitions = map[Opcode]*Definition{
 	OpDiv:      {"OpDiv", []int{}},
 	OpTrue:     {"OpTrue", []int{}},
 	OpFalse:    {"OpFalse", []int{}},
+
+	OpEqual:       {"OpEqual", []int{}},
+	OpNotEqual:    {"OpNotEqual", []int{}},
+	OpGreaterThan: {"OpGreaterThan", []int{}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.

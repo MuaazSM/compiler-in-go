@@ -39,6 +39,23 @@ func TestBooleanExpressions(t *testing.T) {
 	tests := []vmTestCase{
 		{"true", true},
 		{"false", false},
+		{"1 < 2", true},
+		{"1 > 2", false},
+		{"1 < 1", false},
+		{"1 > 1", false},
+		{"1 == 1", true},
+		{"1 != 1", false},
+		{"1 == 2", false},
+		{"1 != 2", true},
+		{"true == true", true},
+		{"false == false", true},
+		{"true == false", false},
+		{"true != false", true},
+		{"false != true", true},
+		{"(1 < 2) == true", true},
+		{"(1 < 2) == false", false},
+		{"(1 > 2) == true", false},
+		{"(1 > 2) == false", true},
 	}
 
 	runVmTests(t, tests)
@@ -136,6 +153,17 @@ func TestStackOverflow(t *testing.T) {
 	if err := vm.push(&object.Integer{Value: 0}); err == nil {
 		t.Fatalf("expected a stack overflow error, got none")
 	}
+}
+
+func TestComparingMixedTypes(t *testing.T) {
+	// `1 == true` must not be treated as an integer compare just because one
+	// side is an integer; it falls through to the pointer compare and is false.
+	tests := []vmTestCase{
+		{"1 == true", false},
+		{"1 != true", true},
+	}
+
+	runVmTests(t, tests)
 }
 
 func TestDivisionByZero(t *testing.T) {
