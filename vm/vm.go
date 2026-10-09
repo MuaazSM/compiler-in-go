@@ -254,7 +254,7 @@ func (vm *VM) Run() error {
 			numArgs := code.ReadUint8(ins[ip+1:])
 			vm.currentFrame().ip += 1
 
-			err := vm.callFunction(int(numArgs))
+			err := vm.executeCall(int(numArgs))
 			if err != nil {
 				return err
 			}
@@ -301,6 +301,17 @@ func (vm *VM) Run() error {
 
 			frame := vm.currentFrame()
 			err := vm.push(vm.stack[frame.basePointer+int(localIndex)])
+			if err != nil {
+				return err
+			}
+
+		case code.OpGetBuiltin:
+			builtinIndex := code.ReadUint8(ins[ip+1:])
+			vm.currentFrame().ip += 1
+
+			definition := object.Builtins[builtinIndex]
+
+			err := vm.push(definition.Builtin)
 			if err != nil {
 				return err
 			}
@@ -353,8 +364,40 @@ func (vm *VM) buildHash(startIndex, endIndex int) (object.Object, error) {
 	return &object.Hash{Pairs: hashedPairs}, nil
 }
 
-// callFunction starts a call to the function sitting below its numArgs
-// arguments on the stack.
+// executeCall looks at what's being called, which sits just below the
+// arguments, and hands off to the right kind of call.
+func (vm *VM) executeCall(numArgs int) error {
+	callee := vm.stack[vm.sp-1-numArgs]
+
+	switch callee := callee.(type) {
+	case *object.CompiledFunction:
+		return vm.callFunction(callee, numArgs)
+	case *object.Builtin:
+		return vm.callBuiltin(callee, numArgs)
+	default:
+		return fmt.Errorf("calling non-function")
+	}
+}
+
+// callBuiltin runs a Go function right away. There's no frame: we hand it
+// the arguments straight off the stack and push whatever it returns.
+func (vm *VM) callBuiltin(builtin *object.Builtin, numArgs int) error {
+	args := vm.stack[vm.sp-numArgs : vm.sp]
+
+	result := builtin.Fn(args...)
+	// Clear away the arguments and the builtin itself.
+	vm.sp = vm.sp - numArgs - 1
+
+	// A builtin returns nil when it has nothing to give back, and the VM
+	// only ever pushes real objects, so nil becomes our Null.
+	if result != nil {
+		return vm.push(result)
+	}
+	return vm.push(Null)
+}
+
+// callFunction starts a call to a compiled function sitting below its
+// numArgs arguments on the stack.
 //
 // While a function runs, the stack looks like this. Everything from
 // basePointer up belongs to the call:
@@ -370,12 +413,7 @@ func (vm *VM) buildHash(startIndex, endIndex int) (object.Object, error) {
 //	           └───────────────┘
 //
 // Concept: calling convention — the agreed stack layout for callee, arguments and locals during a call.
-func (vm *VM) callFunction(numArgs int) error {
-	fn, ok := vm.stack[vm.sp-1-numArgs].(*object.CompiledFunction)
-	if !ok {
-		return fmt.Errorf("calling non-function")
-	}
-
+func (vm *VM) callFunction(fn *object.CompiledFunction, numArgs int) error {
 	if numArgs != fn.NumParameters {
 		return fmt.Errorf("wrong number of arguments: want=%d, got=%d",
 			fn.NumParameters, numArgs)
