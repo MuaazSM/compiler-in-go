@@ -240,6 +240,134 @@ func TestIndexErrors(t *testing.T) {
 	}
 }
 
+func TestCallingFunctionsWithoutArguments(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+			let fivePlusTen = fn() { 5 + 10; };
+			fivePlusTen();
+			`,
+			expected: 15,
+		},
+		{
+			input: `
+			let one = fn() { 1; };
+			let two = fn() { 2; };
+			one() + two()
+			`,
+			expected: 3,
+		},
+		{
+			input: `
+			let a = fn() { 1 };
+			let b = fn() { a() + 1 };
+			let c = fn() { b() + 1 };
+			c();
+			`,
+			expected: 3,
+		},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestFunctionsWithReturnStatement(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+			let earlyExit = fn() { return 99; 100; };
+			earlyExit();
+			`,
+			expected: 99,
+		},
+		{
+			input: `
+			let earlyExit = fn() { return 99; return 100; };
+			earlyExit();
+			`,
+			expected: 99,
+		},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestFunctionsWithoutReturnValue(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+			let noReturn = fn() { };
+			noReturn();
+			`,
+			expected: Null,
+		},
+		{
+			input: `
+			let noReturn = fn() { };
+			let noReturnTwo = fn() { noReturn(); };
+			noReturn();
+			noReturnTwo();
+			`,
+			expected: Null,
+		},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestFirstClassFunctions(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+			let returnsOne = fn() { 1; };
+			let returnsOneReturner = fn() { returnsOne; };
+			returnsOneReturner()();
+			`,
+			expected: 1,
+		},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestTopLevelReturn(t *testing.T) {
+	// A `return` outside any function ends the program with that value,
+	// the same as in the tree-walking evaluator.
+	tests := []vmTestCase{
+		{"return 5; 10", 5},
+		{"if (true) { return 1; } 2", 1},
+	}
+
+	runVmTests(t, tests)
+}
+
+func TestTooManyFrames(t *testing.T) {
+	vm := New(&compiler.Bytecode{})
+	fn := &object.CompiledFunction{}
+
+	// The main frame already takes one slot.
+	for i := 1; i < MaxFrames; i++ {
+		if err := vm.pushFrame(NewFrame(fn)); err != nil {
+			t.Fatalf("pushFrame %d failed early: %s", i, err)
+		}
+	}
+
+	if err := vm.pushFrame(NewFrame(fn)); err == nil {
+		t.Fatalf("expected an error past MaxFrames, got none")
+	}
+}
+
+func TestCallingNonFunctionIsAnError(t *testing.T) {
+	comp := compiler.New()
+	if err := comp.Compile(parse("1()")); err != nil {
+		t.Fatalf("compiler error: %s", err)
+	}
+
+	if err := New(comp.Bytecode()).Run(); err == nil {
+		t.Fatalf("expected an error for calling an integer, got none")
+	}
+}
+
 func runVmTests(t *testing.T, tests []vmTestCase) {
 	t.Helper()
 

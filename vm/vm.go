@@ -16,6 +16,9 @@ const StackSize = 2048
 // so every index the compiler can emit has a slot.
 const GlobalsSize = 65536
 
+// MaxFrames caps how deep calls can nest.
+const MaxFrames = 1024
+
 // There is only ever one true and one false. Every boolean the VM pushes is one
 // of these two, so checking whether two booleans are equal is a pointer compare.
 var True = &object.Boolean{Value: true}
@@ -27,8 +30,7 @@ var Null = &object.Null{}
 // VM executes one compiled program.
 // Concept: stack machine — a VM that does all its work by pushing and popping values on one stack.
 type VM struct {
-	constants    []object.Object
-	instructions code.Instructions
+	constants []object.Object
 
 	stack []object.Object
 	// sp is the slot the next push will fill, so the top value lives at sp-1.
@@ -36,19 +38,53 @@ type VM struct {
 	sp int
 
 	globals []object.Object
+
+	// frames[framesIndex-1] is the call that's running right now.
+	frames      []*Frame
+	framesIndex int
 }
 
 // New sets up a VM for the given bytecode with an empty stack.
 func New(bytecode *compiler.Bytecode) *VM {
+	// The top-level program runs inside a frame too, as if it were the body
+	// of a function nobody called. That way the run loop always reads from
+	// "the current frame" and never needs a separate path for the main code.
+	mainFn := &object.CompiledFunction{Instructions: bytecode.Instructions}
+	mainFrame := NewFrame(mainFn)
+
+	frames := make([]*Frame, MaxFrames)
+	frames[0] = mainFrame
+
 	return &VM{
-		instructions: bytecode.Instructions,
-		constants:    bytecode.Constants,
+		constants: bytecode.Constants,
 
 		stack: make([]object.Object, StackSize),
 		sp:    0,
 
 		globals: make([]object.Object, GlobalsSize),
+
+		frames:      frames,
+		framesIndex: 1,
 	}
+}
+
+func (vm *VM) currentFrame() *Frame {
+	return vm.frames[vm.framesIndex-1]
+}
+
+func (vm *VM) pushFrame(f *Frame) error {
+	if vm.framesIndex >= MaxFrames {
+		return fmt.Errorf("stack overflow: calls nested deeper than %d", MaxFrames)
+	}
+
+	vm.frames[vm.framesIndex] = f
+	vm.framesIndex++
+	return nil
+}
+
+func (vm *VM) popFrame() *Frame {
+	vm.framesIndex--
+	return vm.frames[vm.framesIndex]
 }
 
 // NewWithGlobalsStore is New, but with a globals slice the caller keeps. Passing
@@ -77,15 +113,23 @@ func (vm *VM) LastPoppedStackElem() object.Object {
 // Run executes the instructions from start to finish.
 // Concept: fetch-decode-execute — read an instruction, figure out what it means, do it, repeat.
 func (vm *VM) Run() error {
-	for ip := 0; ip < len(vm.instructions); ip++ {
-		op := code.Opcode(vm.instructions[ip])
+	var ip int
+	var ins code.Instructions
+	var op code.Opcode
+
+	for vm.currentFrame().ip < len(vm.currentFrame().Instructions())-1 {
+		vm.currentFrame().ip++
+
+		ip = vm.currentFrame().ip
+		ins = vm.currentFrame().Instructions()
+		op = code.Opcode(ins[ip])
 
 		switch op {
 		case code.OpConstant:
-			constIndex := code.ReadUint16(vm.instructions[ip+1:])
+			constIndex := code.ReadUint16(ins[ip+1:])
 			// Jump over the two operand bytes we just read, or the loop
 			// would try to run them as opcodes.
-			ip += 2
+			vm.currentFrame().ip += 2
 
 			err := vm.push(vm.constants[constIndex])
 			if err != nil {
@@ -129,32 +173,32 @@ func (vm *VM) Run() error {
 			}
 
 		case code.OpJump:
-			pos := int(code.ReadUint16(vm.instructions[ip+1:]))
+			pos := int(code.ReadUint16(ins[ip+1:]))
 			// The loop adds 1 to ip right after this, so we land one byte
 			// early on purpose and the next fetch reads the target itself.
 			// Concept: instruction pointer (ip) — where in the bytecode the VM is reading right now.
-			ip = pos - 1
+			vm.currentFrame().ip = pos - 1
 
 		case code.OpJumpNotTruthy:
-			pos := int(code.ReadUint16(vm.instructions[ip+1:]))
+			pos := int(code.ReadUint16(ins[ip+1:]))
 			// Skip the operand bytes. If we don't jump, we carry on with the
 			// instruction right after this one.
-			ip += 2
+			vm.currentFrame().ip += 2
 
 			condition := vm.pop()
 			if !isTruthy(condition) {
-				ip = pos - 1
+				vm.currentFrame().ip = pos - 1
 			}
 
 		case code.OpSetGlobal:
-			globalIndex := code.ReadUint16(vm.instructions[ip+1:])
-			ip += 2
+			globalIndex := code.ReadUint16(ins[ip+1:])
+			vm.currentFrame().ip += 2
 
 			vm.globals[globalIndex] = vm.pop()
 
 		case code.OpGetGlobal:
-			globalIndex := code.ReadUint16(vm.instructions[ip+1:])
-			ip += 2
+			globalIndex := code.ReadUint16(ins[ip+1:])
+			vm.currentFrame().ip += 2
 
 			// A compiled program always sets a global before reading it. Only
 			// the REPL can get here with an empty slot, when a line named a
@@ -170,8 +214,8 @@ func (vm *VM) Run() error {
 			}
 
 		case code.OpArray:
-			numElements := int(code.ReadUint16(vm.instructions[ip+1:]))
-			ip += 2
+			numElements := int(code.ReadUint16(ins[ip+1:]))
+			vm.currentFrame().ip += 2
 
 			array := vm.buildArray(vm.sp-numElements, vm.sp)
 			// Drop the elements now that they live inside the array.
@@ -183,8 +227,8 @@ func (vm *VM) Run() error {
 			}
 
 		case code.OpHash:
-			numElements := int(code.ReadUint16(vm.instructions[ip+1:]))
-			ip += 2
+			numElements := int(code.ReadUint16(ins[ip+1:]))
+			vm.currentFrame().ip += 2
 
 			hash, err := vm.buildHash(vm.sp-numElements, vm.sp)
 			if err != nil {
@@ -202,6 +246,46 @@ func (vm *VM) Run() error {
 			left := vm.pop()
 
 			err := vm.executeIndexExpression(left, index)
+			if err != nil {
+				return err
+			}
+
+		case code.OpCall:
+			fn, ok := vm.stack[vm.sp-1].(*object.CompiledFunction)
+			if !ok {
+				return fmt.Errorf("calling non-function")
+			}
+
+			// The function stays on the stack while it runs; we clear it
+			// away when it returns.
+			err := vm.pushFrame(NewFrame(fn))
+			if err != nil {
+				return err
+			}
+
+		case code.OpReturnValue:
+			returnValue := vm.pop()
+
+			// A `return` at the top level has no caller to go back to. Treat
+			// it as "stop here": the value is popped, so it's the result.
+			if vm.framesIndex == 1 {
+				return nil
+			}
+
+			vm.popFrame()
+			// Throw away the function we just called.
+			vm.pop()
+
+			err := vm.push(returnValue)
+			if err != nil {
+				return err
+			}
+
+		case code.OpReturn:
+			vm.popFrame()
+			vm.pop()
+
+			err := vm.push(Null)
 			if err != nil {
 				return err
 			}
