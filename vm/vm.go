@@ -327,6 +327,16 @@ func (vm *VM) Run() error {
 				return err
 			}
 
+		case code.OpGetFree:
+			freeIndex := code.ReadUint8(ins[ip+1:])
+			vm.currentFrame().ip += 1
+
+			currentClosure := vm.currentFrame().cl
+			err := vm.push(currentClosure.Free[freeIndex])
+			if err != nil {
+				return err
+			}
+
 		case code.OpNull:
 			err := vm.push(Null)
 			if err != nil {
@@ -460,7 +470,16 @@ func (vm *VM) pushClosure(constIndex int, numFree int) error {
 		return fmt.Errorf("not a function: %+v", constant)
 	}
 
-	closure := &object.Closure{Fn: function}
+	// The compiler pushed the captured values right before OpClosure. Copy
+	// them into the closure, so it keeps them after the function that
+	// owned them has returned, then take them off the stack.
+	free := make([]object.Object, numFree)
+	for i := 0; i < numFree; i++ {
+		free[i] = vm.stack[vm.sp-numFree+i]
+	}
+	vm.sp = vm.sp - numFree
+
+	closure := &object.Closure{Fn: function, Free: free}
 	return vm.push(closure)
 }
 
