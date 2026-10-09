@@ -67,19 +67,8 @@ func (vm *VM) Run() error {
 				return err
 			}
 
-		case code.OpAdd:
-			// The right operand was pushed last, so it comes off first.
-			right := vm.pop()
-			left := vm.pop()
-
-			leftInt, ok1 := left.(*object.Integer)
-			rightInt, ok2 := right.(*object.Integer)
-			if !ok1 || !ok2 {
-				return fmt.Errorf("unsupported types for +: %s and %s",
-					left.Type(), right.Type())
-			}
-
-			err := vm.push(&object.Integer{Value: leftInt.Value + rightInt.Value})
+		case code.OpAdd, code.OpSub, code.OpMul, code.OpDiv:
+			err := vm.executeBinaryOperation(op)
 			if err != nil {
 				return err
 			}
@@ -90,6 +79,47 @@ func (vm *VM) Run() error {
 	}
 
 	return nil
+}
+
+// executeBinaryOperation pops two operands and pushes the result of op.
+// The right operand was pushed last, so it comes off first.
+func (vm *VM) executeBinaryOperation(op code.Opcode) error {
+	right := vm.pop()
+	left := vm.pop()
+
+	if left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ {
+		return vm.executeBinaryIntegerOperation(op, left, right)
+	}
+
+	return fmt.Errorf("unsupported types for binary operation: %s %s",
+		left.Type(), right.Type())
+}
+
+func (vm *VM) executeBinaryIntegerOperation(op code.Opcode, left, right object.Object) error {
+	leftValue := left.(*object.Integer).Value
+	rightValue := right.(*object.Integer).Value
+
+	var result int64
+
+	switch op {
+	case code.OpAdd:
+		result = leftValue + rightValue
+	case code.OpSub:
+		result = leftValue - rightValue
+	case code.OpMul:
+		result = leftValue * rightValue
+	case code.OpDiv:
+		// Go panics on integer division by zero, which would take the whole
+		// REPL down. Report it as a normal error instead.
+		if rightValue == 0 {
+			return fmt.Errorf("division by zero")
+		}
+		result = leftValue / rightValue
+	default:
+		return fmt.Errorf("unknown integer operator: %d", op)
+	}
+
+	return vm.push(&object.Integer{Value: result})
 }
 
 func (vm *VM) push(o object.Object) error {

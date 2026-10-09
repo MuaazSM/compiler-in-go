@@ -66,6 +66,10 @@ const (
 	OpAdd
 	// OpPop throws away the top of the stack. It ends every expression statement.
 	OpPop
+	// OpSub, OpMul and OpDiv work like OpAdd: pop two, push the result.
+	OpSub
+	OpMul
+	OpDiv
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -80,6 +84,9 @@ var definitions = map[Opcode]*Definition{
 	OpConstant: {"OpConstant", []int{2}},
 	OpAdd:      {"OpAdd", []int{}},
 	OpPop:      {"OpPop", []int{}},
+	OpSub:      {"OpSub", []int{}},
+	OpMul:      {"OpMul", []int{}},
+	OpDiv:      {"OpDiv", []int{}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.

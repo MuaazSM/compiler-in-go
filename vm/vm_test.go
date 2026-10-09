@@ -21,6 +21,15 @@ func TestIntegerArithmetic(t *testing.T) {
 		{"2", 2},
 		{"1 + 2", 3},
 		{"1; 2", 2},
+		{"1 - 2", -1},
+		{"1 * 2", 2},
+		{"4 / 2", 2},
+		{"50 / 2 * 2 + 10 - 5", 55},
+		{"5 + 5 + 5 + 5 - 10", 10},
+		{"2 * 2 * 2 * 2 * 2", 32},
+		{"5 * 2 + 10", 20},
+		{"5 + 2 * 10", 25},
+		{"5 * (2 + 10)", 60},
 	}
 
 	runVmTests(t, tests)
@@ -98,5 +107,17 @@ func TestStackOverflow(t *testing.T) {
 
 	if err := vm.push(&object.Integer{Value: 0}); err == nil {
 		t.Fatalf("expected a stack overflow error, got none")
+	}
+}
+
+func TestDivisionByZero(t *testing.T) {
+	comp := compiler.New()
+	if err := comp.Compile(parse("1 / 0")); err != nil {
+		t.Fatalf("compiler error: %s", err)
+	}
+
+	err := New(comp.Bytecode()).Run()
+	if err == nil {
+		t.Fatalf("expected a division by zero error, got none")
 	}
 }
