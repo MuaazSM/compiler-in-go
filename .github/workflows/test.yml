@@ -6,13 +6,16 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Pinned so the runner image only changes when we choose to move it.
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          # No third-party modules (no go.sum), so there's nothing to cache.
+          cache: false
 
       - name: Vet
         run: go vet ./...
