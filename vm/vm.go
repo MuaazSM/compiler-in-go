@@ -50,7 +50,8 @@ func New(bytecode *compiler.Bytecode) *VM {
 	// of a function nobody called. That way the run loop always reads from
 	// "the current frame" and never needs a separate path for the main code.
 	mainFn := &object.CompiledFunction{Instructions: bytecode.Instructions}
-	mainFrame := NewFrame(mainFn, 0)
+	mainClosure := &object.Closure{Fn: mainFn}
+	mainFrame := NewFrame(mainClosure, 0)
 
 	frames := make([]*Frame, MaxFrames)
 	frames[0] = mainFrame
@@ -316,6 +317,16 @@ func (vm *VM) Run() error {
 				return err
 			}
 
+		case code.OpClosure:
+			constIndex := code.ReadUint16(ins[ip+1:])
+			numFree := code.ReadUint8(ins[ip+3:])
+			vm.currentFrame().ip += 3
+
+			err := vm.pushClosure(int(constIndex), int(numFree))
+			if err != nil {
+				return err
+			}
+
 		case code.OpNull:
 			err := vm.push(Null)
 			if err != nil {
@@ -370,8 +381,8 @@ func (vm *VM) executeCall(numArgs int) error {
 	callee := vm.stack[vm.sp-1-numArgs]
 
 	switch callee := callee.(type) {
-	case *object.CompiledFunction:
-		return vm.callFunction(callee, numArgs)
+	case *object.Closure:
+		return vm.callClosure(callee, numArgs)
 	case *object.Builtin:
 		return vm.callBuiltin(callee, numArgs)
 	default:
@@ -396,8 +407,8 @@ func (vm *VM) callBuiltin(builtin *object.Builtin, numArgs int) error {
 	return vm.push(Null)
 }
 
-// callFunction starts a call to a compiled function sitting below its
-// numArgs arguments on the stack.
+// callClosure starts a call to the closure sitting below its numArgs
+// arguments on the stack.
 //
 // While a function runs, the stack looks like this. Everything from
 // basePointer up belongs to the call:
@@ -413,7 +424,8 @@ func (vm *VM) callBuiltin(builtin *object.Builtin, numArgs int) error {
 //	           └───────────────┘
 //
 // Concept: calling convention — the agreed stack layout for callee, arguments and locals during a call.
-func (vm *VM) callFunction(fn *object.CompiledFunction, numArgs int) error {
+func (vm *VM) callClosure(cl *object.Closure, numArgs int) error {
+	fn := cl.Fn
 	if numArgs != fn.NumParameters {
 		return fmt.Errorf("wrong number of arguments: want=%d, got=%d",
 			fn.NumParameters, numArgs)
@@ -423,7 +435,7 @@ func (vm *VM) callFunction(fn *object.CompiledFunction, numArgs int) error {
 	// in the first slots above the callee. Starting the locals there means
 	// argument i *is* local i. Nothing gets copied; we just point the frame
 	// at the slots the caller filled in.
-	frame := NewFrame(fn, vm.sp-numArgs)
+	frame := NewFrame(cl, vm.sp-numArgs)
 	err := vm.pushFrame(frame)
 	if err != nil {
 		return err
@@ -437,6 +449,19 @@ func (vm *VM) callFunction(fn *object.CompiledFunction, numArgs int) error {
 	vm.sp = frame.basePointer + fn.NumLocals
 
 	return nil
+}
+
+// pushClosure wraps the compiled function at constIndex in a new closure and
+// pushes it.
+func (vm *VM) pushClosure(constIndex int, numFree int) error {
+	constant := vm.constants[constIndex]
+	function, ok := constant.(*object.CompiledFunction)
+	if !ok {
+		return fmt.Errorf("not a function: %+v", constant)
+	}
+
+	closure := &object.Closure{Fn: function}
+	return vm.push(closure)
 }
 
 // executeIndexExpression pushes left[index]. A missing element gives null

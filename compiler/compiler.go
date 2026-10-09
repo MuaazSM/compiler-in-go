@@ -344,7 +344,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 			NumLocals:     numLocals,
 			NumParameters: len(node.Parameters),
 		}
-		c.emit(code.OpConstant, c.addConstant(compiledFn))
+		// The VM only ever calls closures, so even a function that captures
+		// nothing gets wrapped in one. The 0 is how many values it captures.
+		fnIndex := c.addConstant(compiledFn)
+		c.emit(code.OpClosure, fnIndex, 0)
 
 	case *ast.ReturnStatement:
 		err := c.Compile(node.ReturnValue)

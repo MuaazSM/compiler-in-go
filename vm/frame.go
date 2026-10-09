@@ -9,7 +9,7 @@ import (
 // far into its bytecode we are.
 // Concept: call frame — the bookkeeping the VM keeps for each active call.
 type Frame struct {
-	fn *object.CompiledFunction
+	cl *object.Closure
 	// ip starts at -1 because the run loop adds 1 before reading, so the
 	// first instruction it reads is at 0.
 	ip int
@@ -20,13 +20,13 @@ type Frame struct {
 	basePointer int
 }
 
-// NewFrame sets up a frame that will start at the first instruction of fn,
+// NewFrame sets up a frame that will start at the first instruction of cl,
 // with its locals starting at basePointer.
-func NewFrame(fn *object.CompiledFunction, basePointer int) *Frame {
-	return &Frame{fn: fn, ip: -1, basePointer: basePointer}
+func NewFrame(cl *object.Closure, basePointer int) *Frame {
+	return &Frame{cl: cl, ip: -1, basePointer: basePointer}
 }
 
 // Instructions returns the bytecode this frame is running.
 func (f *Frame) Instructions() code.Instructions {
-	return f.fn.Instructions
+	return f.cl.Fn.Instructions
 }

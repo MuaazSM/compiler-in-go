@@ -49,6 +49,8 @@ func (ins Instructions) fmtInstruction(def *Definition, operands []int) string {
 		return def.Name
 	case 1:
 		return fmt.Sprintf("%s %d", def.Name, operands[0])
+	case 2:
+		return fmt.Sprintf("%s %d %d", def.Name, operands[0], operands[1])
 	}
 
 	return fmt.Sprintf("ERROR: unhandled operandCount for %s\n", def.Name)
@@ -114,6 +116,10 @@ const (
 	// OpGetBuiltin pushes one of the builtin functions. The operand is its
 	// position in object.Builtins.
 	OpGetBuiltin
+	// OpClosure wraps a compiled function from the constant pool into a
+	// closure. Operands: the constant index, then how many free variables to
+	// take off the stack.
+	OpClosure
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
@@ -161,6 +167,7 @@ var definitions = map[Opcode]*Definition{
 	OpSetLocal: {"OpSetLocal", []int{1}},
 
 	OpGetBuiltin: {"OpGetBuiltin", []int{1}},
+	OpClosure:    {"OpClosure", []int{2, 1}},
 }
 
 // Lookup returns the definition for an opcode byte, or an error if we don't know it.

@@ -582,16 +582,16 @@ func TestTopLevelReturn(t *testing.T) {
 
 func TestTooManyFrames(t *testing.T) {
 	vm := New(&compiler.Bytecode{})
-	fn := &object.CompiledFunction{}
+	cl := &object.Closure{Fn: &object.CompiledFunction{}}
 
 	// The main frame already takes one slot.
 	for i := 1; i < MaxFrames; i++ {
-		if err := vm.pushFrame(NewFrame(fn, 0)); err != nil {
+		if err := vm.pushFrame(NewFrame(cl, 0)); err != nil {
 			t.Fatalf("pushFrame %d failed early: %s", i, err)
 		}
 	}
 
-	if err := vm.pushFrame(NewFrame(fn, 0)); err == nil {
+	if err := vm.pushFrame(NewFrame(cl, 0)); err == nil {
 		t.Fatalf("expected an error past MaxFrames, got none")
 	}
 }
