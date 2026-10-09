@@ -288,7 +288,7 @@ func evalIdentifier(
 		return val
 	}
 
-	if builtin, ok := builtins[node.Value]; ok {
+	if builtin := object.GetBuiltinByName(node.Value); builtin != nil {
 		return builtin
 	}
 
@@ -345,7 +345,11 @@ func applyFunction(fn object.Object, args []object.Object) object.Object {
 		return unwrapReturnValue(evaluated)
 
 	case *object.Builtin:
-		return fn.Fn(args...)
+		// Builtins return nil when they have nothing to give back.
+		if result := fn.Fn(args...); result != nil {
+			return result
+		}
+		return NULL
 
 	default:
 		return newError("not a function: %s", fn.Type())
