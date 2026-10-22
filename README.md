@@ -65,6 +65,15 @@ Monkey
 Each line you type is compiled and run on the VM, and names you define stay around for the next
 line.
 
+Or run a whole program from a file:
+
+```sh
+go run . examples/demo.monkey
+```
+
+The file is compiled and run in one go. Anything passed to `puts` is printed, then the value of
+the last line (unless it's `null`). `examples/demo.monkey` tours every feature of the language.
+
 Run the tests:
 
 ```sh
