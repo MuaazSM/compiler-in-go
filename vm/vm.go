@@ -28,13 +28,13 @@ var False = &object.Boolean{Value: false}
 var Null = &object.Null{}
 
 // VM executes one compiled program.
-// Concept: stack machine — a VM that does all its work by pushing and popping values on one stack.
+// Concept: stack machine - a VM that does all its work by pushing and popping values on one stack.
 type VM struct {
 	constants []object.Object
 
 	stack []object.Object
 	// sp is the slot the next push will fill, so the top value lives at sp-1.
-	// Concept: stack pointer (sp) — points at the next free slot; the top value is at sp-1.
+	// Concept: stack pointer (sp) - points at the next free slot; the top value is at sp-1.
 	sp int
 
 	globals []object.Object
@@ -111,7 +111,7 @@ func (vm *VM) LastPoppedStackElem() object.Object {
 }
 
 // Run executes the instructions from start to finish.
-// Concept: fetch-decode-execute — read an instruction, figure out what it means, do it, repeat.
+// Concept: fetch-decode-execute - read an instruction, figure out what it means, do it, repeat.
 func (vm *VM) Run() error {
 	var ip int
 	var ins code.Instructions
@@ -176,7 +176,7 @@ func (vm *VM) Run() error {
 			pos := int(code.ReadUint16(ins[ip+1:]))
 			// The loop adds 1 to ip right after this, so we land one byte
 			// early on purpose and the next fetch reads the target itself.
-			// Concept: instruction pointer (ip) — where in the bytecode the VM is reading right now.
+			// Concept: instruction pointer (ip) - where in the bytecode the VM is reading right now.
 			vm.currentFrame().ip = pos - 1
 
 		case code.OpJumpNotTruthy:
@@ -453,7 +453,7 @@ func (vm *VM) callBuiltin(builtin *object.Builtin, numArgs int) error {
 //	           │ caller's data │
 //	           └───────────────┘
 //
-// Concept: calling convention — the agreed stack layout for callee, arguments and locals during a call.
+// Concept: calling convention - the agreed stack layout for callee, arguments and locals during a call.
 func (vm *VM) callClosure(cl *object.Closure, numArgs int) error {
 	fn := cl.Fn
 	if numArgs != fn.NumParameters {
@@ -511,7 +511,7 @@ func (vm *VM) pushClosure(constIndex int, numFree int) error {
 }
 
 // executeIndexExpression pushes left[index]. A missing element gives null
-// rather than an error, the same way the tree-walking evaluator behaves. Asking
+// rather than an error, the same way the tree-walking interpreter behaves. Asking
 // for something that can't exist (a bad type) is still an error.
 func (vm *VM) executeIndexExpression(left, index object.Object) error {
 	switch {
@@ -680,7 +680,7 @@ func (vm *VM) executeMinusOperator() error {
 }
 
 // isTruthy decides which way a conditional jump goes.
-// Concept: truthiness — everything counts as true except false and null.
+// Concept: truthiness - everything counts as true except false and null.
 func isTruthy(obj object.Object) bool {
 	switch obj := obj.(type) {
 	case *object.Boolean:

@@ -2,7 +2,7 @@ package compiler
 
 // SymbolScope says where a name lives, which tells the compiler which
 // instructions to use when reading or writing it.
-// Concept: scope — where a name lives: global, local, builtin, free or the current function.
+// Concept: scope - where a name lives: global, local, builtin, free or the current function.
 type SymbolScope string
 
 const (
@@ -22,7 +22,7 @@ type Symbol struct {
 
 // SymbolTable hands out an index for every name the program defines, so the
 // VM can find values by number instead of by string.
-// Concept: symbol table — the compiler's address book: name → (scope, index).
+// Concept: symbol table - the compiler's address book: name → (scope, index).
 type SymbolTable struct {
 	// Outer is the table of the enclosing code. It's nil for the global table.
 	Outer *SymbolTable
@@ -77,7 +77,7 @@ func (s *SymbolTable) DefineBuiltin(index int, name string) Symbol {
 // DefineFunctionName records the name of the function this table belongs to,
 // so its body can call itself. It takes no slot, and a later Define of the
 // same name replaces it, so a parameter or local can shadow the function.
-// Concept: self-reference — a function referring to itself by name (recursion) before it's fully bound.
+// Concept: self-reference - a function referring to itself by name (recursion) before it's fully bound.
 func (s *SymbolTable) DefineFunctionName(name string) Symbol {
 	symbol := Symbol{Name: name, Index: 0, Scope: FunctionScope}
 	s.store[name] = symbol
@@ -86,7 +86,7 @@ func (s *SymbolTable) DefineFunctionName(name string) Symbol {
 
 // defineFree records that this function captures original from an enclosing
 // scope, and returns the symbol code in this function should use for it.
-// Concept: free variable — a variable used inside a function but defined in an enclosing one.
+// Concept: free variable - a variable used inside a function but defined in an enclosing one.
 func (s *SymbolTable) defineFree(original Symbol) Symbol {
 	s.FreeSymbols = append(s.FreeSymbols, original)
 

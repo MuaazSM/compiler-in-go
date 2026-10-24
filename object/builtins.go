@@ -7,7 +7,7 @@ import "fmt"
 // name, so the compiler and the VM must agree on the order. Only ever add new
 // entries at the end; reordering would make old indexes point at the wrong
 // function.
-// Concept: builtin function — a Go function exposed to Monkey code, looked up by index.
+// Concept: builtin function - a Go function exposed to Monkey code, looked up by index.
 var Builtins = []struct {
 	Name    string
 	Builtin *Builtin
@@ -40,7 +40,7 @@ var Builtins = []struct {
 			}
 
 			// This package has no NULL singleton, so we return nil and let
-			// the caller (evaluator or VM) swap in its own null.
+			// the caller (interpreter or VM) swap in its own null.
 			return nil
 		},
 		},
@@ -139,7 +139,7 @@ var Builtins = []struct {
 }
 
 // GetBuiltinByName returns the builtin with the given name, or nil if there
-// isn't one. The tree-walking evaluator looks builtins up this way.
+// isn't one. The tree-walking interpreter looks builtins up this way.
 func GetBuiltinByName(name string) *Builtin {
 	for _, def := range Builtins {
 		if def.Name == name {
@@ -149,6 +149,8 @@ func GetBuiltinByName(name string) *Builtin {
 	return nil
 }
 
+// newError builds the error value a builtin returns when it's called with the
+// wrong arguments.
 func newError(format string, a ...interface{}) *Error {
 	return &Error{Message: fmt.Sprintf(format, a...)}
 }

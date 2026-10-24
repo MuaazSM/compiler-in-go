@@ -1,3 +1,7 @@
+// Package ast defines the abstract syntax tree: the tree of nodes the parser
+// builds and the compiler walks.
+// Concept: abstract syntax tree (AST) - the program as a tree, with brackets and
+// spacing gone and grouping made explicit.
 package ast
 
 import (
@@ -7,24 +11,28 @@ import (
 	"strings"
 )
 
-// The base Node interface
+// Node is anything that can sit in the tree. String prints the node back as
+// source-like text with brackets added, which makes the grouping easy to see
+// in tests: 1 + 2 * 3 prints as (1 + (2 * 3)).
 type Node interface {
 	TokenLiteral() string
 	String() string
 }
 
-// All statement nodes implement this
+// Statement is a node that does something but produces no value, like let.
 type Statement interface {
 	Node
 	statementNode()
 }
 
-// All expression nodes implement this
+// Expression is a node that produces a value, like 5, x + y or add(1, 2).
+// In Monkey even if and fn are expressions.
 type Expression interface {
 	Node
 	expressionNode()
 }
 
+// Program is the root of every tree: the list of top-level statements.
 type Program struct {
 	Statements []Statement
 }
@@ -48,6 +56,8 @@ func (p *Program) String() string {
 }
 
 // Statements
+
+// LetStatement is let <Name> = <Value>;
 type LetStatement struct {
 	Token token.Token // the token.LET token
 	Name  *Identifier
@@ -72,6 +82,7 @@ func (ls *LetStatement) String() string {
 	return out.String()
 }
 
+// ReturnStatement is return <ReturnValue>;
 type ReturnStatement struct {
 	Token       token.Token // the 'return' token
 	ReturnValue Expression
@@ -93,6 +104,8 @@ func (rs *ReturnStatement) String() string {
 	return out.String()
 }
 
+// ExpressionStatement is an expression standing on its own line, like 1 + 2;
+// Most Monkey lines are this kind.
 type ExpressionStatement struct {
 	Token      token.Token // the first token of the expression
 	Expression Expression
@@ -107,6 +120,8 @@ func (es *ExpressionStatement) String() string {
 	return ""
 }
 
+// BlockStatement is the list of statements between { and }, used by if, else
+// and function bodies.
 type BlockStatement struct {
 	Token      token.Token // the { token
 	Statements []Statement
@@ -125,6 +140,8 @@ func (bs *BlockStatement) String() string {
 }
 
 // Expressions
+
+// Identifier is a name used in the program, like x or add.
 type Identifier struct {
 	Token token.Token // the token.IDENT token
 	Value string
@@ -134,6 +151,7 @@ func (i *Identifier) expressionNode()      {}
 func (i *Identifier) TokenLiteral() string { return i.Token.Literal }
 func (i *Identifier) String() string       { return i.Value }
 
+// Boolean is true or false.
 type Boolean struct {
 	Token token.Token
 	Value bool
@@ -143,6 +161,8 @@ func (b *Boolean) expressionNode()      {}
 func (b *Boolean) TokenLiteral() string { return b.Token.Literal }
 func (b *Boolean) String() string       { return b.Token.Literal }
 
+// IntegerLiteral is a whole number written in the source, already converted
+// from text to an int64 by the parser.
 type IntegerLiteral struct {
 	Token token.Token
 	Value int64
@@ -152,6 +172,7 @@ func (il *IntegerLiteral) expressionNode()      {}
 func (il *IntegerLiteral) TokenLiteral() string { return il.Token.Literal }
 func (il *IntegerLiteral) String() string       { return il.Token.Literal }
 
+// PrefixExpression is an operator in front of a value: -x or !ok.
 type PrefixExpression struct {
 	Token    token.Token // The prefix token, e.g. !
 	Operator string
@@ -171,6 +192,8 @@ func (pe *PrefixExpression) String() string {
 	return out.String()
 }
 
+// InfixExpression is an operator between two values, like a + b. For
+// 1 + 2 * 3, Right of the + node is the whole 2 * 3 node.
 type InfixExpression struct {
 	Token    token.Token // The operator token, e.g. +
 	Left     Expression
@@ -192,6 +215,8 @@ func (oe *InfixExpression) String() string {
 	return out.String()
 }
 
+// IfExpression is if (Condition) { Consequence } else { Alternative }. It
+// produces a value, and Alternative is nil when there is no else.
 type IfExpression struct {
 	Token       token.Token // The 'if' token
 	Condition   Expression
@@ -217,6 +242,8 @@ func (ie *IfExpression) String() string {
 	return out.String()
 }
 
+// FunctionLiteral is fn(Parameters) { Body }. Functions are values in Monkey,
+// so this is an expression that can be stored, passed or returned.
 type FunctionLiteral struct {
 	Token      token.Token // The 'fn' token
 	Parameters []*Identifier
@@ -248,6 +275,7 @@ func (fl *FunctionLiteral) String() string {
 	return out.String()
 }
 
+// CallExpression is a function call like add(1, 2).
 type CallExpression struct {
 	Token     token.Token // The '(' token
 	Function  Expression  // Identifier or FunctionLiteral
@@ -272,6 +300,7 @@ func (ce *CallExpression) String() string {
 	return out.String()
 }
 
+// StringLiteral is text written in double quotes.
 type StringLiteral struct {
 	Token token.Token
 	Value string
@@ -281,6 +310,7 @@ func (sl *StringLiteral) expressionNode()      {}
 func (sl *StringLiteral) TokenLiteral() string { return sl.Token.Literal }
 func (sl *StringLiteral) String() string       { return sl.Token.Literal }
 
+// ArrayLiteral is a list written as [1, 2, 3].
 type ArrayLiteral struct {
 	Token    token.Token // the '[' token
 	Elements []Expression
@@ -303,6 +333,7 @@ func (al *ArrayLiteral) String() string {
 	return out.String()
 }
 
+// IndexExpression reads one item: arr[0] or person["name"].
 type IndexExpression struct {
 	Token token.Token // The [ token
 	Left  Expression
@@ -323,6 +354,7 @@ func (ie *IndexExpression) String() string {
 	return out.String()
 }
 
+// HashLiteral is a dictionary written as {"name": "Ada", "age": 36}.
 type HashLiteral struct {
 	Token token.Token // the '{' token
 	Pairs map[Expression]Expression

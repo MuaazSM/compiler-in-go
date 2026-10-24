@@ -1,3 +1,6 @@
+// Package repl is the interactive prompt. Each line typed goes through the full
+// pipeline: lexer, parser, compiler and VM.
+// Concept: REPL - read a line, evaluate it, print the result, loop.
 package repl
 
 import (
@@ -11,8 +14,10 @@ import (
 	"monkey/vm"
 )
 
+// PROMPT is printed before every line the user types.
 const PROMPT = ">> "
 
+// Start runs the prompt until the input ends (Ctrl+D).
 func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
 
@@ -42,6 +47,8 @@ func Start(in io.Reader, out io.Writer) {
 			continue
 		}
 
+		// Every line gets a fresh compiler, but it reuses the symbol table and
+		// constants from earlier lines, so names defined before still resolve.
 		comp := compiler.NewWithState(symbolTable, constants)
 		err := comp.Compile(program)
 		if err != nil {
@@ -54,6 +61,8 @@ func Start(in io.Reader, out io.Writer) {
 		code := comp.Bytecode()
 		constants = code.Constants
 
+		// Same idea for the VM: a fresh machine per line, sharing one globals
+		// array so values stored earlier are still there.
 		machine := vm.NewWithGlobalsStore(code, globals)
 		err = machine.Run()
 		if err != nil {
@@ -71,6 +80,7 @@ func Start(in io.Reader, out io.Writer) {
 	}
 }
 
+// MONKEY_FACE is shown above parse errors, to keep mistakes friendly.
 const MONKEY_FACE = `            __,__
    .--.  .-"     "-.  .--.
   / .. \/  .-. .-.  \/ .. \
@@ -84,6 +94,7 @@ const MONKEY_FACE = `            __,__
            '-----'
 `
 
+// printParserErrors prints every parse error at once.
 func printParserErrors(out io.Writer, errors []string) {
 	io.WriteString(out, MONKEY_FACE)
 	io.WriteString(out, "Woops! We ran into some monkey business here!\n")

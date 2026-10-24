@@ -8,12 +8,13 @@ import (
 )
 
 // Instructions is a flat run of bytecode: opcodes and their operands, back to back.
-// Concept: bytecode — a compact list of bytes that tells the VM what to do, step by step.
+// Concept: bytecode - a compact list of bytes that tells the VM what to do, step by step.
 type Instructions []byte
 
 // String disassembles the instructions into one readable line per instruction,
 // each prefixed with its byte offset. Tests lean on this to show readable diffs.
-// Concept: disassembler — turns raw bytecode back into readable text, mainly for tests and debugging.
+// Concept: disassembler - turns raw bytecode back into readable text, mainly for tests and debugging.
+
 func (ins Instructions) String() string {
 	var out bytes.Buffer
 
@@ -57,12 +58,12 @@ func (ins Instructions) fmtInstruction(def *Definition, operands []int) string {
 }
 
 // Opcode is the first byte of every instruction.
-// Concept: opcode — the first byte of an instruction; it says which operation to run.
+// Concept: opcode - the first byte of an instruction; it says which operation to run.
 type Opcode byte
 
 const (
 	// OpConstant pushes a value from the constant pool. Its operand is the pool index.
-	// Concept: constant pool — a side list of values (numbers, strings, functions) that instructions refer to by index.
+	// Concept: constant pool - a side list of values (numbers, strings, functions) that instructions refer to by index.
 	OpConstant Opcode = iota
 	// OpAdd pops the top two values and pushes their sum. It has no operands.
 	OpAdd
@@ -93,7 +94,7 @@ const (
 	OpNull
 	// OpSetGlobal pops a value into a global slot; OpGetGlobal pushes one back.
 	// The operand is the slot index the symbol table handed out.
-	// Concept: global binding — a variable stored in a fixed-size globals array, looked up by index.
+	// Concept: global binding - a variable stored in a fixed-size globals array, looked up by index.
 	OpGetGlobal
 	OpSetGlobal
 	// OpArray pops n elements and pushes them as one array. n is the operand.
@@ -112,7 +113,7 @@ const (
 	OpReturn
 	// OpGetLocal and OpSetLocal read and write a local variable of the
 	// running function. One byte of operand allows 256 locals per function.
-	// Concept: local binding — a variable that lives in the stack slots reserved for the current call.
+	// Concept: local binding - a variable that lives in the stack slots reserved for the current call.
 	OpGetLocal
 	OpSetLocal
 	// OpGetBuiltin pushes one of the builtin functions. The operand is its
@@ -130,7 +131,7 @@ const (
 )
 
 // Definition describes an opcode: a readable name and how many bytes each operand takes.
-// Concept: operand — extra bytes after an opcode that give the operation its input (like an index).
+// Concept: operand - extra bytes after an opcode that give the operation its input (like an index).
 type Definition struct {
 	Name          string
 	OperandWidths []int
@@ -211,7 +212,7 @@ func Make(op Opcode, operands ...int) []byte {
 		width := def.OperandWidths[i]
 		switch width {
 		case 2:
-			// Concept: big-endian — the most significant byte comes first in memory.
+			// Concept: big-endian - the most significant byte comes first in memory.
 			binary.BigEndian.PutUint16(instruction[offset:], uint16(o))
 		case 1:
 			instruction[offset] = byte(o)

@@ -109,7 +109,7 @@ stack instead of looking names up in a chain of maps.
 |---|---|
 | `token/`, `lexer/` | Token types and the lexer |
 | `ast/`, `parser/` | AST node types and the Pratt parser |
-| `evaluator/` | The original tree-walking interpreter, kept as a reference and benchmark baseline |
+| `interpreter/` | The original tree-walking interpreter, kept as a reference and benchmark baseline |
 | `object/` | Runtime values (integers, strings, arrays, hashes, closures, …) and the builtin functions |
 | `code/` | The bytecode format: opcodes, `Make`, operand decoding and a disassembler |
 | `compiler/` | AST → bytecode, plus the symbol table that tracks global, local, builtin and free names |

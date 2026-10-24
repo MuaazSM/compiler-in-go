@@ -1,4 +1,9 @@
-package evaluator
+// Package interpreter is a tree-walking interpreter for Monkey. It runs a
+// program by visiting the AST directly, with no bytecode. The project uses it
+// as the baseline in the benchmark (go run ./benchmark -engine=eval), to show
+// how much the compiler and VM speed things up.
+// Concept: tree-walking interpreter - runs a program by visiting AST nodes one by one.
+package interpreter
 
 import (
 	"fmt"
@@ -6,12 +11,18 @@ import (
 	"monkey/object"
 )
 
+// There is only ever one true, one false and one null, so comparing two
+// booleans is just comparing pointers.
 var (
 	NULL  = &object.Null{}
 	TRUE  = &object.Boolean{Value: true}
 	FALSE = &object.Boolean{Value: false}
 )
 
+// Eval is the whole interpreter. It looks at the kind of node, works out its
+// children by calling itself, and returns the value. Every time a line runs,
+// it walks the same nodes and makes the same decisions again. The compiler
+// makes those decisions once, ahead of time, which is why the VM is faster.
 func Eval(node ast.Node, env *object.Environment) object.Object {
 	switch node := node.(type) {
 
@@ -32,6 +43,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		}
 		return &object.ReturnValue{Value: val}
 
+	// Variables are stored by name in the environment map.
 	case *ast.LetStatement:
 		val := Eval(node.Value, env)
 		if isError(val) {
@@ -75,6 +87,8 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 	case *ast.Identifier:
 		return evalIdentifier(node, env)
 
+	// A function value remembers the environment it was created in. That is
+	// how closures work in the interpreter.
 	case *ast.FunctionLiteral:
 		params := node.Parameters
 		body := node.Body
@@ -119,6 +133,8 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 	return nil
 }
 
+// evalProgram runs each top-level statement in order. A return or an error
+// stops the whole program early.
 func evalProgram(program *ast.Program, env *object.Environment) object.Object {
 	var result object.Object
 
@@ -136,6 +152,8 @@ func evalProgram(program *ast.Program, env *object.Environment) object.Object {
 	return result
 }
 
+// evalBlockStatement runs the statements inside { }. It passes a return value
+// up still wrapped, so an outer function knows to stop too.
 func evalBlockStatement(
 	block *ast.BlockStatement,
 	env *object.Environment,
@@ -156,6 +174,7 @@ func evalBlockStatement(
 	return result
 }
 
+// nativeBoolToBooleanObject turns a Go bool into the shared TRUE or FALSE.
 func nativeBoolToBooleanObject(input bool) *object.Boolean {
 	if input {
 		return TRUE
@@ -174,6 +193,8 @@ func evalPrefixExpression(operator string, right object.Object) object.Object {
 	}
 }
 
+// evalInfixExpression picks the right operation from the types of both
+// sides.
 func evalInfixExpression(
 	operator string,
 	left, right object.Object,
@@ -196,6 +217,9 @@ func evalInfixExpression(
 	}
 }
 
+// evalBangOperatorExpression gives !x. Only false and null count as false,
+// so !5 is false.
+// Concept: truthiness - everything counts as true except false and null.
 func evalBangOperatorExpression(right object.Object) object.Object {
 	switch right {
 	case TRUE:
@@ -262,6 +286,8 @@ func evalStringInfixExpression(
 	return &object.String{Value: leftVal + rightVal}
 }
 
+// evalIfExpression runs one branch. With no else and a false condition, the
+// whole if gives null.
 func evalIfExpression(
 	ie *ast.IfExpression,
 	env *object.Environment,
@@ -280,6 +306,9 @@ func evalIfExpression(
 	}
 }
 
+// evalIdentifier looks a name up while the program runs: first in the
+// environment chain, then in the builtins. Doing this search on every use is
+// slow, and it's exactly the work the compiler's symbol table removes.
 func evalIdentifier(
 	node *ast.Identifier,
 	env *object.Environment,
@@ -295,6 +324,7 @@ func evalIdentifier(
 	return newError("identifier not found: %s", node.Value)
 }
 
+// isTruthy decides which branch of an if runs.
 func isTruthy(obj object.Object) bool {
 	switch obj {
 	case NULL:
@@ -312,6 +342,7 @@ func newError(format string, a ...interface{}) *object.Error {
 	return &object.Error{Message: fmt.Sprintf(format, a...)}
 }
 
+// isError lets every step stop as soon as something has gone wrong.
 func isError(obj object.Object) bool {
 	if obj != nil {
 		return obj.Type() == object.ERROR_OBJ
@@ -319,6 +350,8 @@ func isError(obj object.Object) bool {
 	return false
 }
 
+// evalExpressions works out a list of expressions, like call arguments, left
+// to right, and stops at the first error.
 func evalExpressions(
 	exps []ast.Expression,
 	env *object.Environment,
@@ -336,6 +369,7 @@ func evalExpressions(
 	return result
 }
 
+// applyFunction calls a Monkey function or a builtin.
 func applyFunction(fn object.Object, args []object.Object) object.Object {
 	switch fn := fn.(type) {
 
@@ -356,6 +390,9 @@ func applyFunction(fn object.Object, args []object.Object) object.Object {
 	}
 }
 
+// extendFunctionEnv makes a fresh environment for one call and puts each
+// argument in it under its parameter name. A new map for every call is part of
+// why calls are slow here.
 func extendFunctionEnv(
 	fn *object.Function,
 	args []object.Object,
@@ -369,6 +406,8 @@ func extendFunctionEnv(
 	return env
 }
 
+// unwrapReturnValue removes the return wrapper once we're back at the call, so
+// the return doesn't also end the caller.
 func unwrapReturnValue(obj object.Object) object.Object {
 	if returnValue, ok := obj.(*object.ReturnValue); ok {
 		return returnValue.Value
@@ -388,6 +427,8 @@ func evalIndexExpression(left, index object.Object) object.Object {
 	}
 }
 
+// evalArrayIndexExpression gives null for an index outside the array instead
+// of an error.
 func evalArrayIndexExpression(array, index object.Object) object.Object {
 	arrayObject := array.(*object.Array)
 	idx := index.(*object.Integer).Value
@@ -400,6 +441,8 @@ func evalArrayIndexExpression(array, index object.Object) object.Object {
 	return arrayObject.Elements[idx]
 }
 
+// evalHashLiteral builds a hash. Each key must be hashable (integer, boolean
+// or string).
 func evalHashLiteral(
 	node *ast.HashLiteral,
 	env *object.Environment,

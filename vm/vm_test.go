@@ -724,7 +724,7 @@ func TestUnknownOpcodeIsAnError(t *testing.T) {
 
 func TestLetSeesPreviousBinding(t *testing.T) {
 	// The value is worked out before the new binding exists, so `x` on the
-	// right means the old x. Same as the tree-walking evaluator.
+	// right means the old x. Same as the tree-walking interpreter.
 	tests := []vmTestCase{
 		{"let x = 1; let x = x + 1; x", 2},
 		{"let f = fn() { let x = 1; let x = x * 10; x }; f()", 10},
@@ -858,7 +858,7 @@ func TestRecursiveFibonacci(t *testing.T) {
 
 func TestTopLevelReturn(t *testing.T) {
 	// A `return` outside any function ends the program with that value,
-	// the same as in the tree-walking evaluator.
+	// the same as in the tree-walking interpreter.
 	tests := []vmTestCase{
 		{"return 5; 10", 5},
 		{"if (true) { return 1; } 2", 1},

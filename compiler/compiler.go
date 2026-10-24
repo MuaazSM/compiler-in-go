@@ -17,7 +17,7 @@ type EmittedInstruction struct {
 
 // CompilationScope is one instruction buffer. A function body gets its own, so
 // its bytecode doesn't get mixed into the code around it.
-// Concept: compilation scope — a separate instruction buffer used while compiling a function body.
+// Concept: compilation scope - a separate instruction buffer used while compiling a function body.
 type CompilationScope struct {
 	instructions code.Instructions
 
@@ -153,7 +153,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		// We don't know where the consequence ends yet, so we jump to a dummy
 		// address (9999) for now and fix it once we've compiled the block.
-		// Concept: back-patching — emit a placeholder jump, fill in the real target later.
+		// Concept: back-patching - emit a placeholder jump, fill in the real target later.
 		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
 
 		err = c.Compile(node.Consequence)
@@ -197,7 +197,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.LetStatement:
 		// Compile the value first, while the name still means whatever it
 		// meant before this line. So `let x = x + 1` reads the old x, and
-		// `let y = y` is an error, just like in the evaluator. A function
+		// `let y = y` is an error, just like in the interpreter. A function
 		// that calls itself doesn't need the name yet: it reaches itself
 		// through its own name (see DefineFunctionName).
 		err := c.Compile(node.Value)
@@ -340,7 +340,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		// A function hands back its last expression even without `return`.
 		// That expression ends in OpPop, so we swap it for OpReturnValue.
-		// Concept: implicit return — the last expression in a function body is its return value.
+		// Concept: implicit return - the last expression in a function body is its return value.
 		if c.lastInstructionIs(code.OpPop) {
 			c.replaceLastPopWithReturn()
 		}

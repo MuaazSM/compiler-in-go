@@ -1,4 +1,4 @@
-package evaluator
+package interpreter
 
 import (
 	"monkey/lexer"

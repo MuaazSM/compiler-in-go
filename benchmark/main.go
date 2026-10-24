@@ -1,5 +1,5 @@
 // Command benchmark runs the same recursive fibonacci program on either the
-// tree-walking evaluator or the bytecode VM, and reports how long it took.
+// tree-walking interpreter or the bytecode VM, and reports how long it took.
 //
 //	go build -o fibonacci ./benchmark
 //	./fibonacci -engine=eval
@@ -14,7 +14,7 @@ import (
 
 	"monkey/ast"
 	"monkey/compiler"
-	"monkey/evaluator"
+	"monkey/interpreter"
 	"monkey/lexer"
 	"monkey/object"
 	"monkey/parser"
@@ -79,7 +79,7 @@ func main() {
 		env := object.NewEnvironment()
 
 		start := time.Now()
-		result = evaluator.Eval(program, env)
+		result = interpreter.Eval(program, env)
 		duration = time.Since(start)
 
 	default:

@@ -1,3 +1,7 @@
+// Command monkey runs Monkey programs through our compiler and VM.
+//
+//	go run .                  start the interactive prompt
+//	go run . file.monkey      compile and run a whole file
 package main
 
 import (
@@ -24,6 +28,9 @@ func main() {
 	repl.Start(os.Stdin, os.Stdout)
 }
 
+// runFile reads a whole program from disk and runs it in one go. Any error
+// is printed with the file name, and the exit code is 1 so scripts can tell
+// it failed.
 func runFile(path string) {
 	input, err := os.ReadFile(path)
 	if err != nil {

@@ -7,7 +7,7 @@ import (
 
 // Frame is one function call in progress: which function is running and how
 // far into its bytecode we are.
-// Concept: call frame — the bookkeeping the VM keeps for each active call.
+// Concept: call frame - the bookkeeping the VM keeps for each active call.
 type Frame struct {
 	cl *object.Closure
 	// ip starts at -1 because the run loop adds 1 before reading, so the
@@ -16,7 +16,7 @@ type Frame struct {
 
 	// basePointer is where this call's locals start on the stack. Local
 	// number i lives at stack[basePointer+i].
-	// Concept: base pointer — the stack index where the current call's locals begin.
+	// Concept: base pointer - the stack index where the current call's locals begin.
 	basePointer int
 }
 

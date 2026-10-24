@@ -1,3 +1,5 @@
+// Package parser reads the lexer's tokens and builds the abstract syntax tree
+// (AST), the second phase of the compiler.
 package parser
 
 import (
@@ -8,6 +10,9 @@ import (
 	"strconv"
 )
 
+// Precedence levels, from weakest to strongest. A higher number binds more
+// tightly, so in 1 + 2 * 3 the * grabs its operands before the + does.
+// Concept: operator precedence - which operator gets its operands first.
 const (
 	_ int = iota
 	LOWEST
@@ -20,6 +25,9 @@ const (
 	INDEX       // array[index]
 )
 
+// precedences says how strongly each infix token binds. "(" and "[" are here
+// too, because a call like add(1) or an index like arr[0] sits after its
+// left side, just like an operator.
 var precedences = map[token.TokenType]int{
 	token.EQ:       EQUALS,
 	token.NOT_EQ:   EQUALS,
@@ -33,11 +41,17 @@ var precedences = map[token.TokenType]int{
 	token.LBRACKET: INDEX,
 }
 
+// A prefix function handles a token that starts an expression, like a number,
+// a name or "-". An infix function handles a token that sits between two
+// expressions, like "+", and gets the left side already parsed.
+// Concept: Pratt parsing - each token type brings its own small parse function.
 type (
 	prefixParseFn func() ast.Expression
 	infixParseFn  func(ast.Expression) ast.Expression
 )
 
+// Parser keeps two tokens in view: the one it is on and the one after it.
+// Looking one token ahead is enough to decide what to do next.
 type Parser struct {
 	l      *lexer.Lexer
 	errors []string
@@ -49,6 +63,7 @@ type Parser struct {
 	infixParseFns  map[token.TokenType]infixParseFn
 }
 
+// New builds a parser and tells it which function handles which token.
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{
 		l:      l,
@@ -89,6 +104,7 @@ func New(l *lexer.Lexer) *Parser {
 	return p
 }
 
+// nextToken moves both tokens one step forward.
 func (p *Parser) nextToken() {
 	p.curToken = p.peekToken
 	p.peekToken = p.l.NextToken()
@@ -102,6 +118,8 @@ func (p *Parser) peekTokenIs(t token.TokenType) bool {
 	return p.peekToken.Type == t
 }
 
+// expectPeek moves forward only if the next token is the one we need, like the
+// "=" after "let x". If it isn't, it records an error instead.
 func (p *Parser) expectPeek(t token.TokenType) bool {
 	if p.peekTokenIs(t) {
 		p.nextToken()
@@ -112,6 +130,8 @@ func (p *Parser) expectPeek(t token.TokenType) bool {
 	}
 }
 
+// Errors returns every problem found. We keep parsing after a mistake, so the
+// user sees all of them at once.
 func (p *Parser) Errors() []string {
 	return p.errors
 }
@@ -127,6 +147,8 @@ func (p *Parser) noPrefixParseFnError(t token.TokenType) {
 	p.errors = append(p.errors, msg)
 }
 
+// ParseProgram is the entry point: it reads statements until EOF and returns
+// the root of the tree.
 func (p *Parser) ParseProgram() *ast.Program {
 	program := &ast.Program{}
 	program.Statements = []ast.Statement{}
@@ -142,6 +164,8 @@ func (p *Parser) ParseProgram() *ast.Program {
 	return program
 }
 
+// parseStatement picks the right kind of statement from its first token.
+// Anything that isn't let or return is an expression on its own line.
 func (p *Parser) parseStatement() ast.Statement {
 	switch p.curToken.Type {
 	case token.LET:
@@ -153,6 +177,7 @@ func (p *Parser) parseStatement() ast.Statement {
 	}
 }
 
+// parseLetStatement reads let <name> = <expression>;
 func (p *Parser) parseLetStatement() *ast.LetStatement {
 	stmt := &ast.LetStatement{Token: p.curToken}
 
@@ -209,6 +234,11 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	return stmt
 }
 
+// parseExpression is the heart of the parser. It parses one piece with the
+// prefix function, then keeps folding in infix operators for as long as the
+// next one binds more tightly than the level it was called with. That is how
+// 1 + 2 * 3 becomes 1 + (2 * 3): the * is stronger, so it takes the 2 first.
+// Concept: operator precedence - which operator gets its operands first.
 func (p *Parser) parseExpression(precedence int) ast.Expression {
 	prefix := p.prefixParseFns[p.curToken.Type]
 	if prefix == nil {
@@ -231,6 +261,8 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	return leftExp
 }
 
+// peekPrecedence and curPrecedence look up how strongly a token binds. Tokens
+// that aren't operators get LOWEST, which ends the loop in parseExpression.
 func (p *Parser) peekPrecedence() int {
 	if p, ok := precedences[p.peekToken.Type]; ok {
 		return p
@@ -270,6 +302,8 @@ func (p *Parser) parseStringLiteral() ast.Expression {
 	return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
 }
 
+// parsePrefixExpression handles -x and !x. The operand is parsed at PREFIX
+// level, so -a * b means (-a) * b.
 func (p *Parser) parsePrefixExpression() ast.Expression {
 	expression := &ast.PrefixExpression{
 		Token:    p.curToken,
@@ -283,6 +317,8 @@ func (p *Parser) parsePrefixExpression() ast.Expression {
 	return expression
 }
 
+// parseInfixExpression builds a node like a + b. The right side is parsed at
+// the operator's own level, which keeps 1 - 2 - 3 grouped as (1 - 2) - 3.
 func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	expression := &ast.InfixExpression{
 		Token:    p.curToken,
@@ -301,6 +337,8 @@ func (p *Parser) parseBoolean() ast.Expression {
 	return &ast.Boolean{Token: p.curToken, Value: p.curTokenIs(token.TRUE)}
 }
 
+// parseGroupedExpression handles brackets. Parsing the inside from LOWEST is
+// all it takes for (1 + 2) * 3 to add first.
 func (p *Parser) parseGroupedExpression() ast.Expression {
 	p.nextToken()
 
@@ -313,6 +351,7 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 	return exp
 }
 
+// parseIfExpression reads if (<condition>) { ... } with an optional else.
 func (p *Parser) parseIfExpression() ast.Expression {
 	expression := &ast.IfExpression{Token: p.curToken}
 
@@ -346,6 +385,7 @@ func (p *Parser) parseIfExpression() ast.Expression {
 	return expression
 }
 
+// parseBlockStatement reads the statements between { and }.
 func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	block := &ast.BlockStatement{Token: p.curToken}
 	block.Statements = []ast.Statement{}
@@ -363,6 +403,8 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	return block
 }
 
+// parseFunctionLiteral reads fn(<params>) { <body> }. The name, if any, is
+// filled in later by parseLetStatement.
 func (p *Parser) parseFunctionLiteral() ast.Expression {
 	lit := &ast.FunctionLiteral{Token: p.curToken}
 
@@ -408,12 +450,15 @@ func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 	return identifiers
 }
 
+// parseCallExpression runs when "(" follows an expression, as in add(1, 2).
 func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {
 	exp := &ast.CallExpression{Token: p.curToken, Function: function}
 	exp.Arguments = p.parseExpressionList(token.RPAREN)
 	return exp
 }
 
+// parseExpressionList reads comma separated expressions up to the end token.
+// Call arguments and array elements both use it.
 func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {
 	list := []ast.Expression{}
 
@@ -446,6 +491,7 @@ func (p *Parser) parseArrayLiteral() ast.Expression {
 	return array
 }
 
+// parseIndexExpression runs when "[" follows an expression, as in arr[0].
 func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
 	exp := &ast.IndexExpression{Token: p.curToken, Left: left}
 
@@ -459,6 +505,8 @@ func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
 	return exp
 }
 
+// parseHashLiteral reads {key: value, ...}. Keys can be any expression; the
+// VM checks later that they can actually be used as keys.
 func (p *Parser) parseHashLiteral() ast.Expression {
 	hash := &ast.HashLiteral{Token: p.curToken}
 	hash.Pairs = make(map[ast.Expression]ast.Expression)
@@ -488,6 +536,8 @@ func (p *Parser) parseHashLiteral() ast.Expression {
 	return hash
 }
 
+// registerPrefix and registerInfix fill the lookup tables used by
+// parseExpression.
 func (p *Parser) registerPrefix(tokenType token.TokenType, fn prefixParseFn) {
 	p.prefixParseFns[tokenType] = fn
 }

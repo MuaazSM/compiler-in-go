@@ -11,7 +11,7 @@ Both start the same way: a lexer and parser turn source text into a tree (the AS
 they split. An **interpreter** walks the tree and *does* what each node says, right away. A
 **compiler** walks the tree and *writes down* instructions in some other language, which
 something else runs later. Our project keeps the first half (lexer, parser, AST) and swaps the
-tree-walking evaluator for a compiler plus a machine that runs what it produces.
+tree-walking interpreter for a compiler plus a machine that runs what it produces.
 
 ---
 
@@ -65,7 +65,7 @@ There are two big families of VM:
 Register machines need fewer instructions to do the same work, so they can be faster. But they're
 harder to build, and the compiler has to be smarter to decide what goes in which register. A
 stack machine is simpler to compile to and simpler to run. We're here to learn, so we pick the
-stack machine. Even so, it ends up about 3× faster than the tree-walking evaluator.
+stack machine. Even so, it ends up about 3× faster than the tree-walking interpreter.
 
 ---
 
